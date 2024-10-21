@@ -9,10 +9,10 @@ Source code of simulations and analyses from Maith, O., Apenburg, D., & Hamker, 
 ## Using the Scripts
 
 **Generating Data:**
-The data generated and analyzed in the study can be found [here](https://doi.org/10.5281/zenodo.12819011).
+The data generated and analyzed in the study can also be downloaded from [Zenodo](https://doi.org/10.5281/zenodo.12819011).
 
-1. Download experimental data from De A Marcelino et al. (2023) and extract it into the "Data_experimental_study" folder. Download link: https://osf.io/fs36g/files/osfstorage
-2. Rename the file "Data_experimental_study/osfstorage-archive/Behavioral data" to "Behavioral_data". There should be no spaces in the path.
+1. Download experimental data from De A Marcelino et al. (2023) and extract it into the "Data_experimental_study" folder. Download link: https://osf.io/fs36g/files/osfstorage (only the folder "Behavioural data" required). After extracting, the data files should be in the directory "Data_experimental_study/osfstorage-archive/Behavioral data/".
+2. Rename the directory "Data_experimental_study/osfstorage-archive/Behavioral data" to "Behavioral_data". There should be no spaces in the path.
 3. Run the "patient_data.py" script to process the experimental data.
 4. In "run_simulation.py", set the variable `get_simulation_data` to True (set all other variables to False) and run the script. -> 1200 simulations
 5. In "run_simulation.py", set the variable `get_activity_change_data` to True (set all other variables to False) and run the script. -> 1200 simulations (only first trial)

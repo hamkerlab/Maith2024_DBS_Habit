@@ -6,3 +6,5 @@ https://osf.io/fs36g/
 
 and extract zip in this folder
 rename Behavioural data --> Behavioural_data 
+
+After extracting and renaming, the data files should be in the directory "Data_experimental_study/osfstorage-archive/Behavioral_data/"

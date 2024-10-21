@@ -2,9 +2,9 @@
 *.png
 __*/
 annarchy*/
-# Ignore everything in Data_experimental_study folder except the data_placeholder file
-Data_experimental_study/*
-!Data_experimental_study/data_placeholder
+
+Data_experimental_study/osfstorage-archive/Behavioural_data/*
+!Data_experimental_study/osfstorage-archive/Behavioural_data/data_placeholder
 
 data/activity_change/*
 !data/activity_change/place_holder_change_activity
