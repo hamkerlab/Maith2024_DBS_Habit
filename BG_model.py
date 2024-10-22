@@ -128,18 +128,6 @@ def create_network(seed, dbs_state, shortcut, parameter, dbs_param_state):
         description="Synaptic plasticity based on covariance, with an additional regularization term.",
     )
 
-    ########################### lateral synapse (GPi) ###############################
-    # GPiGPi
-    ReversedSynapse = Synapse(
-        parameters="""
-        """,
-        psp="""
-            w * pos(1.0 - pre.r)
-        """,
-        name="Reversed Synapse",
-        description="Higher pre-synaptic activity lowers the synaptic transmission and vice versa.",
-    )
-
     ############################## striatal synapse ##################################
     # ITStrD1, ITStrD2, ITSTN
     DAPostCovarianceNoThreshold = Synapse(
@@ -522,7 +510,7 @@ def create_network(seed, dbs_state, shortcut, parameter, dbs_param_state):
         weights=params["StrThalStrThal.connect_all_to_all"]
     )
 
-    GPiGPi = Projection(pre=GPi, post=GPi, target="exc", synapse=ReversedSynapse)
+    GPiGPi = Projection(pre=GPi, post=GPi, target="inh", synapse=StandardSynapse)
     GPiGPi.connect_all_to_all(weights=params["GPiGPi.connect_all_to_all"])
 
     ########################### Thalamus Feedback ################################
