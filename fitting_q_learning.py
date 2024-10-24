@@ -147,6 +147,81 @@ def get_action_is_one_probs_single(alpha, beta, actions, rewards):
     return pt.exp(logp_actions[:, 1])
 
 
+def update_Q_single_multi_subjects(action, reward, Qs, alpha):
+    """
+    This function is called by pytensor.scan. It updates the Q-values according to
+    the Q-learning update rule using a vector of learning rates for multiple subjects.
+
+    Args:
+        action (n x 1 pytensor.TensorVariable):
+            Action taken (one per subject).
+        reward (n x 1 pytensor.TensorVariable):
+            Reward received (one per subject).
+        Qs (n x 2 pytensor.TensorVariable):
+            Q-values (one set per subject).
+        alpha (n x 1 pytensor.TensorVariable):
+            Learning rates for each subject.
+
+    Returns:
+        Qs (n x 2 pytensor.TensorVariable):
+            Updated Q-values (one set per subject).
+    """
+
+    # Update Q-values for each subject
+    Qs = pt.set_subtensor(
+        Qs[pt.arange(Qs.shape[0]), action],
+        Qs[pt.arange(Qs.shape[0]), action]
+        + alpha * (reward - Qs[pt.arange(Qs.shape[0]), action]),
+    )
+
+    return Qs
+
+
+def get_action_is_one_probs_single_multi_subjects(alpha, beta, actions, rewards):
+    """
+    This function computes the probability of selecting action 1 for each trial using
+    Q-learning for multiple subjects with different alpha and beta values.
+
+    Args:
+        alpha (n pytensor.TensorVariable):
+            Learning rates (one per subject).
+        beta (n pytensor.TensorVariable):
+            Inverse temperature parameters (one per subject).
+        actions (n x m numpy.ndarray):
+            Matrix of actions (n subjects, m trials).
+        rewards (n x m numpy.ndarray):
+            Matrix of rewards (n subjects, m trials).
+
+    Returns:
+        probs (n x (m-1) pytensor.TensorVariable):
+            Matrix of probabilities of selecting action 1 for each subject (except the last trial).
+    """
+
+    # Convert actions and rewards matrices to tensors
+    rewards = pt.as_tensor_variable(rewards, dtype="int32")
+    actions = pt.as_tensor_variable(actions, dtype="int32")
+
+    n_subjects = actions.shape[0]
+
+    # Initialize Q-values (one set of [Q0, Q1] per subject)
+    Qs = 0.5 * pt.ones((n_subjects, 2), dtype="float64")
+
+    # Compute Q-values for each trial using pytensor.scan
+    Qs, _ = pytensor.scan(
+        fn=update_Q_single_multi_subjects,
+        sequences=[actions.T, rewards.T],  # Transpose to iterate over trials
+        outputs_info=[Qs],
+        non_sequences=[alpha],
+    )
+
+    # Compute log probabilities for each trial (but exclude the last trial's Q-values)
+    Qs = Qs[:-1] * beta[None, :, None]
+    logp_actions = Qs - pt.logsumexp(Qs, axis=2, keepdims=True)
+
+    # Return probabilities of selecting action 1 after each trial for each subject
+    return pt.exp(logp_actions[:, :, 1]).T
+
+
 def update_Q(action, reward, Qs, alpha_plus, alpha_minus):
     """
     This fucniton is called by pytensor.scan.
@@ -224,6 +299,92 @@ def get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions, rewards):
     return pt.exp(logp_actions[:, 1])
 
 
+def update_Q_multi_subjects(action, reward, Qs, alpha_plus, alpha_minus):
+    """
+    This function is called by pytensor.scan. It updates the Q-values according to
+    the Q-learning update rule using a vector of learning rates for multiple subjects.
+
+    Args:
+        action (n x 1 pytensor.TensorVariable):
+            Action taken (one per subject).
+        reward (n x 1 pytensor.TensorVariable):
+            Reward received (one per subject).
+        Qs (n x 2 pytensor.TensorVariable):
+            Q-values (one set per subject).
+        alpha_plus (n x 1 pytensor.TensorVariable):
+            Learning rates for positive prediction errors (one per subject).
+        alpha_minus (n x 1 pytensor.TensorVariable):
+            Learning rates for negative prediction errors (one per subject).
+
+    Returns:
+        Qs (n x 2 pytensor.TensorVariable):
+            Updated Q-values (one set per subject).
+    """
+
+    # Use pt.switch to select alpha based on the comparison
+    alpha = pt.switch(
+        reward > Qs[pt.arange(Qs.shape[0]), action], alpha_plus, alpha_minus
+    )
+
+    # Update Q-values for each subject
+    Qs = pt.set_subtensor(
+        Qs[pt.arange(Qs.shape[0]), action],
+        Qs[pt.arange(Qs.shape[0]), action]
+        + alpha * (reward - Qs[pt.arange(Qs.shape[0]), action]),
+    )
+
+    return Qs
+
+
+def get_action_is_one_probs_multi_subjects(
+    alpha_plus, alpha_minus, beta, actions, rewards
+):
+    """
+    This function computes the probability of selecting action 1 for each trial using
+    Q-learning for multiple subjects with different alpha and beta values.
+
+    Args:
+        alpha_plus (n pytensor.TensorVariable):
+            Learning rates for positive prediction errors (one per subject).
+        alpha_minus (n pytensor.TensorVariable):
+            Learning rates for negative prediction errors (one per subject).
+        beta (n pytensor.TensorVariable):
+            Inverse temperature parameters (one per subject).
+        actions (n x m numpy.ndarray):
+            Matrix of actions (n subjects, m trials).
+        rewards (n x m numpy.ndarray):
+            Matrix of rewards (n subjects, m trials).
+
+    Returns:
+        probs (n x (m-1) pytensor.TensorVariable):
+            Matrix of probabilities of selecting action 1 for each subject (except the last trial).
+    """
+
+    # Convert actions and rewards matrices to tensors
+    rewards = pt.as_tensor_variable(rewards, dtype="int32")
+    actions = pt.as_tensor_variable(actions, dtype="int32")
+
+    n_subjects = actions.shape[0]
+
+    # Initialize Q-values (one set of [Q0, Q1] per subject)
+    Qs = 0.5 * pt.ones((n_subjects, 2), dtype="float64")
+
+    # Compute Q-values for each trial using pytensor.scan
+    Qs, _ = pytensor.scan(
+        fn=update_Q_multi_subjects,
+        sequences=[actions.T, rewards.T],  # Transpose to iterate over trials
+        outputs_info=[Qs],
+        non_sequences=[alpha_plus, alpha_minus],
+    )
+
+    # Compute log probabilities for each trial (but exclude the last trial's Q-values)
+    Qs = Qs[:-1] * beta[None, :, None]
+    logp_actions = Qs - pt.logsumexp(Qs, axis=2, keepdims=True)
+
+    # Return probabilities of selecting action 1 after each trial for each subject
+    return pt.exp(logp_actions[:, :, 1]).T
+
+
 if __name__ == "__main__":
     az.style.use("arviz-darkgrid")
     seed = 123
@@ -233,10 +394,141 @@ if __name__ == "__main__":
     true_alpha_plus = 0.9
     true_alpha_minus = 0.1
     true_beta = 5
-    n = 120
+    n = 121
     actions, rewards, _ = generate_data_q_learn(
         rng, true_alpha_plus, true_alpha_minus, true_beta, n
     )
+
+    # # tests for multiple subjects functions
+    # actions = np.array([1, 1, 1, 1, 1, 1])
+    # rewards = np.array([0, 0, 0, 0, 0, 0])
+
+    # actions2 = np.array([1, 1, 1, 1, 1, 1])
+    # rewards2 = np.array([1, 1, 1, 1, 1, 1])
+
+    # actions3 = np.array([0, 0, 0, 0, 0, 0])
+    # rewards3 = np.array([1, 1, 1, 1, 1, 1])
+
+    # actions_comb = np.stack([actions, actions2, actions3], axis=0)
+    # rewards_comb = np.stack([rewards, rewards2, rewards3], axis=0)
+
+    # # test single function for sample 1
+    # print("function with single learning rates:")
+
+    # alpha = pt.dscalar("alpha")
+    # beta = pt.dscalar("beta")
+
+    # ret = get_action_is_one_probs_single(alpha, beta, actions, rewards)
+
+    # # compile the function
+    # f = pytensor.function([alpha, beta], ret)
+
+    # # test the function
+    # ret = f(0.5, 5.0)
+
+    # print(actions[1:])
+    # print(rewards[1:])
+    # print(ret)
+    # print("\n")
+
+    # # test single function for sample 2
+
+    # alpha = pt.dscalar("alpha")
+    # beta = pt.dscalar("beta")
+
+    # ret = get_action_is_one_probs_single(alpha, beta, actions2, rewards2)
+
+    # # compile the function
+    # f = pytensor.function([alpha, beta], ret)
+
+    # # test the function
+    # ret = f(0.5, 5.0)
+
+    # print(actions2[1:])
+    # print(rewards2[1:])
+    # print(ret)
+    # print("\n")
+
+    # # test multy single function for both samples
+
+    # alpha = pt.vector("alpha")
+    # beta = pt.vector("beta")
+
+    # ret = get_action_is_one_probs_single_multi_subjects(
+    #     alpha, beta, actions_comb, rewards_comb
+    # )
+
+    # # compile the function
+    # f = pytensor.function([alpha, beta], ret)
+
+    # # test the function
+    # ret = f([0.5, 0.5, 0.5], [5.0, 5.0, 5.0])
+
+    # print(actions_comb[:, 1:])
+    # print(rewards_comb[:, 1:])
+    # print(ret)
+    # print("\n\n")
+
+    # # test two function for sample 1
+    # print("function with two learning rates:")
+
+    # alpha_plus = pt.dscalar("alpha_plus")
+    # alpha_minus = pt.dscalar("alpha_minus")
+    # beta = pt.dscalar("beta")
+
+    # ret = get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions, rewards)
+
+    # # compile the function
+    # f = pytensor.function([alpha_plus, alpha_minus, beta], ret)
+
+    # # test the function
+    # ret = f(0.9, 0.1, 5.0)
+
+    # print(actions[1:])
+    # print(rewards[1:])
+    # print(ret)
+    # print("\n")
+
+    # # test two function for sample 2
+
+    # alpha_plus = pt.dscalar("alpha_plus")
+    # alpha_minus = pt.dscalar("alpha_minus")
+    # beta = pt.dscalar("beta")
+
+    # ret = get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions2, rewards2)
+
+    # # compile the function
+    # f = pytensor.function([alpha_plus, alpha_minus, beta], ret)
+
+    # # test the function
+    # ret = f(0.9, 0.1, 5.0)
+
+    # print(actions2[1:])
+    # print(rewards2[1:])
+    # print(ret)
+    # print("\n")
+
+    # # test multy two function for both samples
+
+    # alpha_plus = pt.vector("alpha_plus")
+    # alpha_minus = pt.vector("alpha_minus")
+    # beta = pt.vector("beta")
+
+    # ret = get_action_is_one_probs_multi_subjects(
+    #     alpha_plus, alpha_minus, beta, actions_comb, rewards_comb
+    # )
+
+    # # compile the function
+    # f = pytensor.function([alpha_plus, alpha_minus, beta], ret)
+
+    # # test the function
+    # ret = f([0.9, 0.9, 0.9], [0.1, 0.1, 0.1], [5.0, 5.0, 5.0])
+
+    # print(actions_comb[:, 1:])
+    # print(rewards_comb[:, 1:])
+    # print(ret)
+
+    # quit()
 
     # model with single learning rate
     with pm.Model() as m_bernoulli_single:
