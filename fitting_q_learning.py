@@ -385,29 +385,98 @@ def get_action_is_one_probs_multi_subjects(
     return pt.exp(logp_actions[:, :, 1]).T
 
 
+def pad_nan_on_third_dim(array):
+    max_array_size = max(len(sub_arr) for row in array for sub_arr in row)
+
+    # Pad each array to the maximum length with NaN values
+    return np.array(
+        [
+            [
+                np.concatenate(
+                    [sub_arr, np.full(max_array_size - len(sub_arr), np.nan)]
+                )
+                for sub_arr in row
+            ]
+            for row in array
+        ]
+    )
+
+
+def test(coords, alpha, beta, actions_arr, rewards_arr):
+    # for loop over dbs
+    action_is_one_probs_list = []
+    for dbs in coords["dbs"]:
+        # for loop over subjects
+        for subject in coords["subjects"]:
+            # compute the probability of selecting action 1 after each trial
+            action_is_one_probs_list.append(
+                get_action_is_one_probs_single(
+                    alpha[dbs][subject],
+                    beta[dbs][subject],
+                    actions_arr[dbs, subject],
+                    rewards_arr[dbs, subject],
+                )
+            )
+    action_is_one_probs_arr = pt.concatenate(action_is_one_probs_list)
+
+    return action_is_one_probs_arr
+
+
 if __name__ == "__main__":
     az.style.use("arviz-darkgrid")
     seed = 123
     rng = np.random.default_rng(seed)
 
     # generate data using the true parameters
-    true_alpha_plus = 0.9
-    true_alpha_minus = 0.1
-    true_beta = 5
-    n = 121
-    actions, rewards, _ = generate_data_q_learn(
-        rng, true_alpha_plus, true_alpha_minus, true_beta, n
+    true_alpha_plus = 0.5
+    true_alpha_minus = 0.5
+
+    actions_arr = np.empty((2, 3), dtype=object)
+    rewards_arr = np.empty((2, 3), dtype=object)
+    observed_list = []
+    true_beta_arr = np.empty((2, 3), dtype=float)
+
+    for dbs in [0, 1]:
+        for subject in range(3):
+            # fake effect for beta
+            true_beta = 5 + 5 * subject - dbs * 4
+            true_beta_arr[dbs, subject] = true_beta
+
+            n = 100 + rng.integers(-20, 20)
+
+            actions, rewards, _ = generate_data_q_learn(
+                rng, true_alpha_plus, true_alpha_minus, true_beta, n
+            )
+
+            actions_arr[dbs, subject] = actions
+            rewards_arr[dbs, subject] = rewards
+            observed_list.append(actions[1:])
+
+    observed_arr = np.concatenate(observed_list)
+
+    print(true_beta_arr)
+
+    # calculate a weighted average of true_beta, weighted by the number of trials
+    # for each subject
+    true_beta_mean = np.average(
+        true_beta_arr,
+        weights=np.array([[len(sub_arr) for sub_arr in row] for row in actions_arr]),
     )
+    print(true_beta_mean)
+
+    # # create padded arrays, pad nan values to the right in the third dimension
+    # actions = pad_nan_on_third_dim(actions)
+    # rewards = pad_nan_on_third_dim(rewards)
 
     # # tests for multiple subjects functions
-    # actions = np.array([1, 1, 1, 1, 1, 1])
-    # rewards = np.array([0, 0, 0, 0, 0, 0])
+    # actions = np.array([1, 1, 1, 1, 1, 1, np.nan, np.nan])
+    # rewards = np.array([0, 0, 0, 0, 0, 0, np.nan, np.nan])
 
-    # actions2 = np.array([1, 1, 1, 1, 1, 1])
-    # rewards2 = np.array([1, 1, 1, 1, 1, 1])
+    # actions2 = np.array([1, 1, 1, 1, 1, 1, 1, np.nan])
+    # rewards2 = np.array([1, 1, 1, 1, 1, 1, 1, np.nan])
 
-    # actions3 = np.array([0, 0, 0, 0, 0, 0])
-    # rewards3 = np.array([1, 1, 1, 1, 1, 1])
+    # actions3 = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+    # rewards3 = np.array([1, 1, 1, 1, 1, 1, 1, 1])
 
     # actions_comb = np.stack([actions, actions2, actions3], axis=0)
     # rewards_comb = np.stack([rewards, rewards2, rewards3], axis=0)
@@ -430,6 +499,7 @@ if __name__ == "__main__":
     # print(rewards[1:])
     # print(ret)
     # print("\n")
+    # quit()
 
     # # test single function for sample 2
 
@@ -528,13 +598,167 @@ if __name__ == "__main__":
     # print(rewards_comb[:, 1:])
     # print(ret)
 
-    # quit()
+    coords = {
+        "dbs": range(actions_arr.shape[0]),
+        "subjects": range(actions_arr.shape[1]),
+    }
+
+    with pm.Model(coords=coords) as m_bernoulli_single:
+        # observed data
+        observed_data = pm.Data("observed_data", observed_arr)
+
+        # # prior for the learning rate (alpha) and the inverse temperature (beta)
+        # alpha = pm.Beta(name="alpha", alpha=1, beta=1)
+        # beta = pm.HalfNormal(name="beta", sigma=10, dims="subjects")
+
+        # hierarchical learning rate paramter for DBS OFF data
+        mu_alpha = pm.Uniform("mu_alpha", lower=0.0, upper=1.0)
+        sig_alpha_log = pm.Exponential("sig_alpha_log", lam=1.5)
+        sig_alpha = pm.Deterministic("sig_alpha", pt.exp(sig_alpha_log))
+        alpha = pm.Beta(
+            "alpha",
+            alpha=mu_alpha * sig_alpha,
+            beta=(1.0 - mu_alpha) * sig_alpha,
+            dims="subjects",
+        )
+
+        # hierarchical deviation of learning rate paramter for DBS ON data
+        mu_alpha_dev = pm.Normal("mu_alpha_dev", mu=0.0, sigma=0.2)
+        sig_alpha_dev = pm.Exponential("sig_alpha_dev", lam=10)
+        alpha_dev = pm.Normal(
+            "alpha_dev", mu=mu_alpha_dev, sigma=sig_alpha_dev, dims="subjects"
+        )
+
+        # deterministic computation of the learning rate for DBS ON data
+        alpha_dbs_on = pm.Deterministic(
+            "alpha_dbs_on", pt.clip(alpha + alpha_dev, 0.0, 1.0), dims="subjects"
+        )
+
+        # hierarchical inverse temperature parameter for DBS OFF data
+        mu_beta = pm.Gamma("mu_beta", alpha=10.0, beta=1.0)
+        sig_beta = pm.Exponential("sig_beta", lam=1.0)
+        beta = pm.Gamma(
+            "beta",
+            alpha=mu_beta**2 / sig_beta,
+            beta=mu_beta / sig_beta,
+            dims="subjects",
+        )
+
+        # hierarchical deviation of inverse temperature parameter for DBS ON data
+        mu_beta_dev = pm.Normal("mu_beta_dev", mu=0.0, sigma=10.0)
+        sig_beta_dev = pm.Exponential("sig_beta_dev", lam=1)
+        beta_dev = pm.Normal(
+            "beta_dev", mu=mu_beta_dev, sigma=sig_beta_dev, dims="subjects"
+        )
+
+        # deterministic computation of the inverse temperature parameter for DBS ON data
+        beta_dbs_on = pm.Deterministic(
+            "beta_dbs_on", pt.clip(beta + beta_dev, 0.0, 1000.0), dims="subjects"
+        )
+
+        # compute the probability of selecting action 1 after each trial based on parameters
+        action_is_one_probs = pm.Deterministic(
+            "action_is_one_probs",
+            test(
+                coords,
+                [alpha, alpha_dbs_on],
+                [beta, beta_dbs_on],
+                actions_arr,
+                rewards_arr,
+            ),
+        )
+        pm.Bernoulli(
+            name="like",
+            p=action_is_one_probs,
+            observed=observed_data,
+        )
+
+        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+        # likelihood with the computed probabilities
+        # like = pm.Bernoulli(name="like", p=action_is_one_probs, observed=onserved_data)
+        # sample from the posterior
+        trace_single = pm.sample(random_seed=rng)
+        # compute the log likelihood of the model
+        pm.compute_log_likelihood(trace_single)
+
+    # plot model
+    pm.model_to_graphviz(m_bernoulli_single).render("model_bernoulli")
+
+    # plot the posterior distributions
+    for var_name in ["alpha", "beta", "alpha_dbs_on", "beta_dbs_on"]:
+        az.plot_posterior(
+            data=trace_single,
+            var_names=[var_name],
+        )
+
+    ax = az.plot_forest(
+        trace_single,
+        var_names=["alpha", "beta", "alpha_dbs_on", "beta_dbs_on"],
+        r_hat=True,
+        combined=True,
+        figsize=(6, 18),
+    )
+    plt.show()
+
+    quit()
+
+    coords = {
+        "dbs": range(actions.shape[0]),
+        "subjects": range(actions.shape[1]),
+        "trials": range(actions.shape[2]),
+    }
 
     # model with single learning rate
-    with pm.Model() as m_bernoulli_single:
-        # prior for the learning rate (alpha) and the inverse temperature (beta)
-        alpha = pm.Beta(name="alpha", alpha=1, beta=1)
-        beta = pm.HalfNormal(name="beta", sigma=10)
+    with pm.Model(coords=coords) as m_bernoulli_single_hierarchical:
+        # observed data
+        actions_data = pm.Data("actions_data", actions)
+        rewards_data = pm.Data("rewards_data", rewards)
+
+        # hierarchical learning rate paramter for DBS OFF data
+        mu_alpha = pm.Uniform("mu_alpha", lower=0.0, upper=1.0)
+        sig_alpha_log = pm.Exponential("sig_alpha_log", lam=1.5)
+        sig_alpha = pm.Deterministic("sig_alpha", pt.exp(sig_alpha_log))
+        alpha = pm.Beta(
+            "alpha",
+            alpha=mu_alpha * sig_alpha,
+            beta=(1.0 - mu_alpha) * sig_alpha,
+            dims="subjects",
+        )
+
+        # hierarchical deviation of learning rate paramter for DBS ON data
+        mu_alpha_dev = pm.Normal("mu_alpha_dev", mu=0.0, sigma=0.2)
+        sig_alpha_dev = pm.Exponential("sig_alpha_dev", lam=10)
+        alpha_dev = pm.Normal(
+            "alpha_dev", mu=mu_alpha_dev, sigma=sig_alpha_dev, dims="subjects"
+        )
+
+        # deterministic computation of the learning rate for DBS ON data
+        alpha_dbs_on = pm.Deterministic(
+            "alpha_dbs_on", pt.clip(alpha + alpha_dev, 0.0, 1.0)
+        )
+
+        # hierarchical inverse temperature parameter for DBS OFF data
+        mu_beta = pm.Gamma("mu_beta", alpha=10.0, beta=2.0)
+        sig_beta = pm.Exponential("sig_beta", lam=1.0)
+        beta = pm.Gamma(
+            "beta",
+            alpha=mu_beta**2 / sig_beta,
+            beta=mu_beta / sig_beta,
+            dims="subjects",
+        )
+
+        # hierarchical deviation of inverse temperature parameter for DBS ON data
+        mu_beta_dev = pm.Normal("mu_beta_dev", mu=0.0, sigma=1.0)
+        sig_beta_dev = pm.Exponential("sig_beta_dev", lam=5)
+        beta_dev = pm.Normal(
+            "beta_dev", mu=mu_beta_dev, sigma=sig_beta_dev, dims="subjects"
+        )
+
+        # deterministic computation of the inverse temperature parameter for DBS ON data
+        beta_dbs_on = pm.Deterministic(
+            "beta_dbs_on", pt.clip(beta + beta_dev, 0.0, None)
+        )
+
         # compute the probability of selecting action 1 after each trial
         action_is_one_probs = pm.Deterministic(
             "action_is_one_probs",
