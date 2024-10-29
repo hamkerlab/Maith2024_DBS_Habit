@@ -465,7 +465,7 @@ if __name__ == "__main__":
     rng = np.random.default_rng(seed)
 
     # generate data using the true parameters
-    n_subjects = 14
+    n_subjects = 1
     true_alpha = np.clip(rng.normal(loc=0.3, scale=0.05, size=n_subjects), 0.01, 1.0)
     true_alpha_plus = true_alpha
     true_alpha_minus = np.clip(true_alpha + 0.15, 0.01, 1.0)
@@ -487,7 +487,7 @@ if __name__ == "__main__":
     for dbs in [0, 1]:
         for subject in range(n_subjects):
 
-            n = 100 + rng.integers(-20, 20)
+            n = 10 + rng.integers(-2, 2)
 
             actions, rewards, _ = generate_data_q_learn(
                 rng,
@@ -614,22 +614,23 @@ if __name__ == "__main__":
     pm.model_to_graphviz(m_bernoulli_single).render(f"{save_folder}/single_model_plot")
 
     # visualize the prior samples distribution
-    az.plot_density(
-        idata_single,
-        group="prior",
-        var_names=[
-            "alpha_mean_global",
-            "alpha_mean_per_dbs",
-            "alpha_mean_per_subject",
-            "alpha_alpha",
-            "alpha_beta",
-            "alpha",
-            "beta_mean_global",
-            "beta_mean_per_dbs",
-            "beta",
-        ],
-    )
-    plt.savefig(f"{save_folder}/single_prior_samples.png")
+    for var_name in [
+        "alpha_mean_global",
+        "alpha_mean_per_dbs",
+        "alpha_mean_per_subject",
+        "alpha_alpha",
+        "alpha_beta",
+        "alpha",
+        "beta_mean_global",
+        "beta_mean_per_dbs",
+        "beta",
+    ]:
+        az.plot_density(
+            idata_single,
+            group="prior",
+            var_names=[var_name],
+        )
+        plt.savefig(f"{save_folder}/single_prior_samples_{var_name}.png")
 
     # sample the posterior
     with m_bernoulli_single:
@@ -840,28 +841,29 @@ if __name__ == "__main__":
     pm.model_to_graphviz(m_bernoulli_double).render(f"{save_folder}/double_model_plot")
 
     # visualize the prior samples distribution
-    az.plot_density(
-        idata_double,
-        group="prior",
-        var_names=[
-            "alpha_plus_mean_global",
-            "alpha_plus_mean_per_dbs",
-            "alpha_plus_mean_per_subject",
-            "alpha_plus_alpha",
-            "alpha_plus_beta",
-            "alpha_plus",
-            "alpha_minus_mean_global",
-            "alpha_minus_mean_per_dbs",
-            "alpha_minus_mean_per_subject",
-            "alpha_minus_alpha",
-            "alpha_minus_beta",
-            "alpha_minus",
-            "beta_mean_global",
-            "beta_mean_per_dbs",
-            "beta",
-        ],
-    )
-    plt.savefig(f"{save_folder}/double_prior_samples.png")
+    for var_name in [
+        "alpha_plus_mean_global",
+        "alpha_plus_mean_per_dbs",
+        "alpha_plus_mean_per_subject",
+        "alpha_plus_alpha",
+        "alpha_plus_beta",
+        "alpha_plus",
+        "alpha_minus_mean_global",
+        "alpha_minus_mean_per_dbs",
+        "alpha_minus_mean_per_subject",
+        "alpha_minus_alpha",
+        "alpha_minus_beta",
+        "alpha_minus",
+        "beta_mean_global",
+        "beta_mean_per_dbs",
+        "beta",
+    ]:
+        az.plot_density(
+            idata_double,
+            group="prior",
+            var_names=[var_name],
+        )
+        plt.savefig(f"{save_folder}/double_prior_samples_{var_name}.png")
 
     # sample the posterior
     with m_bernoulli_double:
