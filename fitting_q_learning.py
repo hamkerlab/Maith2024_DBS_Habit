@@ -468,8 +468,9 @@ if __name__ == "__main__":
     n_subjects = 14
     true_alpha = np.clip(rng.normal(loc=0.3, scale=0.05, size=n_subjects), 0.01, 1.0)
     true_alpha_plus = true_alpha
-    true_alpha_minus = true_alpha
-    true_alpha_2d = np.stack([true_alpha_plus, true_alpha_minus], axis=1)
+    true_alpha_minus = np.clip(true_alpha + 0.15, 0.01, 1.0)
+    true_alpha_plus_2d = np.stack([true_alpha_plus, true_alpha_plus], axis=1)
+    true_alpha_minus_2d = np.stack([true_alpha_minus, true_alpha_minus], axis=1)
 
     actions_arr = np.empty((2, n_subjects), dtype=object)
     rewards_arr = np.empty((2, n_subjects), dtype=object)
@@ -479,7 +480,8 @@ if __name__ == "__main__":
 
     # print true alpha and beta in text file
     with open(f"{save_folder}/true_alpha_beta.txt", "w") as f:
-        f.write(f"True alpha:\n{true_alpha_2d}\n\n")
+        f.write(f"True alpha plus:\n{true_alpha_plus_2d}\n\n")
+        f.write(f"True alpha minus:\n{true_alpha_minus_2d}\n\n")
         f.write(f"True beta:\n{true_beta_2d}\n")
 
     for dbs in [0, 1]:
@@ -489,8 +491,8 @@ if __name__ == "__main__":
 
             actions, rewards, _ = generate_data_q_learn(
                 rng,
-                true_alpha_2d[subject, dbs],
-                true_alpha_2d[subject, dbs],
+                true_alpha_plus_2d[subject, dbs],
+                true_alpha_minus_2d[subject, dbs],
                 true_beta_2d[subject, dbs],
                 n,
             )
@@ -656,7 +658,7 @@ if __name__ == "__main__":
     az.plot_posterior(
         data=idata_single,
         var_names=["alpha"],
-        ref_val=true_alpha_2d.flatten().tolist(),
+        ref_val=true_alpha_plus_2d.flatten().tolist(),
     )
     plt.savefig(f"{save_folder}/single_posterior_alpha.png")
 
@@ -893,7 +895,7 @@ if __name__ == "__main__":
     az.plot_posterior(
         data=idata_double,
         var_names=["alpha_plus"],
-        ref_val=true_alpha_2d.flatten().tolist(),
+        ref_val=true_alpha_plus_2d.flatten().tolist(),
     )
     plt.savefig(f"{save_folder}/double_posterior_alpha_plus.png")
 
@@ -901,7 +903,7 @@ if __name__ == "__main__":
     az.plot_posterior(
         data=idata_double,
         var_names=["alpha_minus"],
-        ref_val=true_alpha_2d.flatten().tolist(),
+        ref_val=true_alpha_minus_2d.flatten().tolist(),
     )
     plt.savefig(f"{save_folder}/double_posterior_alpha_minus.png")
 
