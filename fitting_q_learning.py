@@ -17,6 +17,7 @@ import pytensor.tensor as pt
 import pymc as pm
 import arviz as az
 import matplotlib.pyplot as plt
+import os
 
 
 def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.6):
@@ -222,7 +223,7 @@ def get_action_is_one_probs_single_multi_subjects(alpha, beta, actions, rewards)
     return pt.exp(logp_actions[:, :, 1]).T
 
 
-def update_Q(action, reward, Qs, alpha_plus, alpha_minus):
+def update_Q_double(action, reward, Qs, alpha_plus, alpha_minus):
     """
     This fucniton is called by pytensor.scan.
     It updates the Q-values according to the Q-learning update rule using two learning
@@ -254,7 +255,7 @@ def update_Q(action, reward, Qs, alpha_plus, alpha_minus):
     return Qs
 
 
-def get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions, rewards):
+def get_action_is_one_probs_double(alpha_plus, alpha_minus, beta, actions, rewards):
     """
     This function computes the probability of selecting action 1 for each trial using
     Q-learning with given parameters and the given actions and rewards. Q-learning
@@ -284,7 +285,7 @@ def get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions, rewards):
     # Compute the Q-values for each trial (result = after each trial) using pytensor.scan
     Qs = 0.5 * pt.ones((2,), dtype="float64")
     Qs, _ = pytensor.scan(
-        fn=update_Q,
+        fn=update_Q_double,
         sequences=[actions, rewards],
         outputs_info=[Qs],
         non_sequences=[alpha_plus, alpha_minus],
@@ -402,7 +403,7 @@ def pad_nan_on_third_dim(array):
     )
 
 
-def test(coords, alpha, beta, actions_arr, rewards_arr):
+def get_probabilities_single(coords, alpha, beta, actions_arr, rewards_arr):
     # for loop over dbs
     action_is_one_probs_list = []
     for dbs in coords["dbs"]:
@@ -411,8 +412,8 @@ def test(coords, alpha, beta, actions_arr, rewards_arr):
             # compute the probability of selecting action 1 after each trial
             action_is_one_probs_list.append(
                 get_action_is_one_probs_single(
-                    alpha[dbs][subject],
-                    beta[dbs][subject],
+                    alpha[subject, dbs],
+                    beta[subject, dbs],
                     actions_arr[dbs, subject],
                     rewards_arr[dbs, subject],
                 )
@@ -422,30 +423,76 @@ def test(coords, alpha, beta, actions_arr, rewards_arr):
     return action_is_one_probs_arr
 
 
+def get_probabilities_double(
+    coords, alpha_plus, alpha_minus, beta, actions_arr, rewards_arr
+):
+    # for loop over dbs
+    action_is_one_probs_list = []
+    for dbs in coords["dbs"]:
+        # for loop over subjects
+        for subject in coords["subjects"]:
+            # compute the probability of selecting action 1 after each trial
+            action_is_one_probs_list.append(
+                get_action_is_one_probs_double(
+                    alpha_plus[subject, dbs],
+                    alpha_minus[subject, dbs],
+                    beta[subject, dbs],
+                    actions_arr[dbs, subject],
+                    rewards_arr[dbs, subject],
+                )
+            )
+    action_is_one_probs_arr = pt.concatenate(action_is_one_probs_list)
+
+    return action_is_one_probs_arr
+
+
+def my_Gamma(name, mu, sigma, dims=None):
+    var = sigma**2
+    return pm.Gamma(
+        name,
+        alpha=mu**2 / var,
+        beta=mu / var,
+        dims=dims,
+    )
+
+
 if __name__ == "__main__":
+    save_folder = "results_fitting_q_learning"
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
     az.style.use("arviz-darkgrid")
     seed = 123
     rng = np.random.default_rng(seed)
 
     # generate data using the true parameters
-    true_alpha_plus = 0.5
-    true_alpha_minus = 0.5
+    n_subjects = 14
+    true_alpha = np.clip(rng.normal(loc=0.3, scale=0.05, size=n_subjects), 0.01, 1.0)
+    true_alpha_plus = true_alpha
+    true_alpha_minus = true_alpha
+    true_alpha_2d = np.stack([true_alpha_plus, true_alpha_minus], axis=1)
 
-    actions_arr = np.empty((2, 3), dtype=object)
-    rewards_arr = np.empty((2, 3), dtype=object)
+    actions_arr = np.empty((2, n_subjects), dtype=object)
+    rewards_arr = np.empty((2, n_subjects), dtype=object)
     observed_list = []
-    true_beta_arr = np.empty((2, 3), dtype=float)
+    true_beta_arr = np.clip(rng.normal(loc=1.5, scale=0.25, size=n_subjects), 0.5, 3.0)
+    true_beta_2d = np.stack([true_beta_arr, true_beta_arr / 2], axis=1)
+
+    # print true alpha and beta in text file
+    with open(f"{save_folder}/true_alpha_beta.txt", "w") as f:
+        f.write(f"True alpha:\n{true_alpha_2d}\n\n")
+        f.write(f"True beta:\n{true_beta_2d}\n")
 
     for dbs in [0, 1]:
-        for subject in range(3):
-            # fake effect for beta
-            true_beta = 5 + 5 * subject - dbs * 4
-            true_beta_arr[dbs, subject] = true_beta
+        for subject in range(n_subjects):
 
             n = 100 + rng.integers(-20, 20)
 
             actions, rewards, _ = generate_data_q_learn(
-                rng, true_alpha_plus, true_alpha_minus, true_beta, n
+                rng,
+                true_alpha_2d[subject, dbs],
+                true_alpha_2d[subject, dbs],
+                true_beta_2d[subject, dbs],
+                n,
             )
 
             actions_arr[dbs, subject] = actions
@@ -454,355 +501,436 @@ if __name__ == "__main__":
 
     observed_arr = np.concatenate(observed_list)
 
-    print(true_beta_arr)
-
-    # calculate a weighted average of true_beta, weighted by the number of trials
-    # for each subject
-    true_beta_mean = np.average(
-        true_beta_arr,
-        weights=np.array([[len(sub_arr) for sub_arr in row] for row in actions_arr]),
-    )
-    print(true_beta_mean)
-
-    # # create padded arrays, pad nan values to the right in the third dimension
-    # actions = pad_nan_on_third_dim(actions)
-    # rewards = pad_nan_on_third_dim(rewards)
-
-    # # tests for multiple subjects functions
-    # actions = np.array([1, 1, 1, 1, 1, 1, np.nan, np.nan])
-    # rewards = np.array([0, 0, 0, 0, 0, 0, np.nan, np.nan])
-
-    # actions2 = np.array([1, 1, 1, 1, 1, 1, 1, np.nan])
-    # rewards2 = np.array([1, 1, 1, 1, 1, 1, 1, np.nan])
-
-    # actions3 = np.array([0, 0, 0, 0, 0, 0, 0, 0])
-    # rewards3 = np.array([1, 1, 1, 1, 1, 1, 1, 1])
-
-    # actions_comb = np.stack([actions, actions2, actions3], axis=0)
-    # rewards_comb = np.stack([rewards, rewards2, rewards3], axis=0)
-
-    # # test single function for sample 1
-    # print("function with single learning rates:")
-
-    # alpha = pt.dscalar("alpha")
-    # beta = pt.dscalar("beta")
-
-    # ret = get_action_is_one_probs_single(alpha, beta, actions, rewards)
-
-    # # compile the function
-    # f = pytensor.function([alpha, beta], ret)
-
-    # # test the function
-    # ret = f(0.5, 5.0)
-
-    # print(actions[1:])
-    # print(rewards[1:])
-    # print(ret)
-    # print("\n")
-    # quit()
-
-    # # test single function for sample 2
-
-    # alpha = pt.dscalar("alpha")
-    # beta = pt.dscalar("beta")
-
-    # ret = get_action_is_one_probs_single(alpha, beta, actions2, rewards2)
-
-    # # compile the function
-    # f = pytensor.function([alpha, beta], ret)
-
-    # # test the function
-    # ret = f(0.5, 5.0)
-
-    # print(actions2[1:])
-    # print(rewards2[1:])
-    # print(ret)
-    # print("\n")
-
-    # # test multy single function for both samples
-
-    # alpha = pt.vector("alpha")
-    # beta = pt.vector("beta")
-
-    # ret = get_action_is_one_probs_single_multi_subjects(
-    #     alpha, beta, actions_comb, rewards_comb
-    # )
-
-    # # compile the function
-    # f = pytensor.function([alpha, beta], ret)
-
-    # # test the function
-    # ret = f([0.5, 0.5, 0.5], [5.0, 5.0, 5.0])
-
-    # print(actions_comb[:, 1:])
-    # print(rewards_comb[:, 1:])
-    # print(ret)
-    # print("\n\n")
-
-    # # test two function for sample 1
-    # print("function with two learning rates:")
-
-    # alpha_plus = pt.dscalar("alpha_plus")
-    # alpha_minus = pt.dscalar("alpha_minus")
-    # beta = pt.dscalar("beta")
-
-    # ret = get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions, rewards)
-
-    # # compile the function
-    # f = pytensor.function([alpha_plus, alpha_minus, beta], ret)
-
-    # # test the function
-    # ret = f(0.9, 0.1, 5.0)
-
-    # print(actions[1:])
-    # print(rewards[1:])
-    # print(ret)
-    # print("\n")
-
-    # # test two function for sample 2
-
-    # alpha_plus = pt.dscalar("alpha_plus")
-    # alpha_minus = pt.dscalar("alpha_minus")
-    # beta = pt.dscalar("beta")
-
-    # ret = get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions2, rewards2)
-
-    # # compile the function
-    # f = pytensor.function([alpha_plus, alpha_minus, beta], ret)
-
-    # # test the function
-    # ret = f(0.9, 0.1, 5.0)
-
-    # print(actions2[1:])
-    # print(rewards2[1:])
-    # print(ret)
-    # print("\n")
-
-    # # test multy two function for both samples
-
-    # alpha_plus = pt.vector("alpha_plus")
-    # alpha_minus = pt.vector("alpha_minus")
-    # beta = pt.vector("beta")
-
-    # ret = get_action_is_one_probs_multi_subjects(
-    #     alpha_plus, alpha_minus, beta, actions_comb, rewards_comb
-    # )
-
-    # # compile the function
-    # f = pytensor.function([alpha_plus, alpha_minus, beta], ret)
-
-    # # test the function
-    # ret = f([0.9, 0.9, 0.9], [0.1, 0.1, 0.1], [5.0, 5.0, 5.0])
-
-    # print(actions_comb[:, 1:])
-    # print(rewards_comb[:, 1:])
-    # print(ret)
-
     coords = {
         "dbs": range(actions_arr.shape[0]),
         "subjects": range(actions_arr.shape[1]),
     }
 
+    # model with single learning rate
     with pm.Model(coords=coords) as m_bernoulli_single:
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # # prior for the learning rate (alpha) and the inverse temperature (beta)
-        # alpha = pm.Beta(name="alpha", alpha=1, beta=1)
-        # beta = pm.HalfNormal(name="beta", sigma=10, dims="subjects")
+        # mean for alpha globally
+        alpha_mean_global = pm.TruncatedNormal(
+            "alpha_mean_global",
+            mu=0.3,
+            sigma=0.15,
+            lower=0,
+            upper=1,
+        )
+        alpha_sig_global = pm.Exponential("alpha_sig_global", lam=10)
 
-        # hierarchical learning rate paramter for DBS OFF data
-        mu_alpha = pm.Uniform("mu_alpha", lower=0.0, upper=1.0)
-        sig_alpha_log = pm.Exponential("sig_alpha_log", lam=1.5)
-        sig_alpha = pm.Deterministic("sig_alpha", pt.exp(sig_alpha_log))
+        # mean for alpha per dbs condition from global
+        alpha_mean_per_dbs = pm.TruncatedNormal(
+            "alpha_mean_per_dbs",
+            mu=alpha_mean_global,
+            sigma=alpha_sig_global,
+            lower=0,
+            upper=1,
+            dims="dbs",
+        )
+        alpha_sig_per_dbs = pm.Exponential("alpha_sig_per_dbs", lam=10, dims="dbs")
+
+        # mean for alpha per subject from per dbs condition
+        alpha_mean_per_subject = pm.TruncatedNormal(
+            "alpha_mean_per_subject",
+            mu=alpha_mean_per_dbs,
+            sigma=alpha_sig_per_dbs,
+            lower=0,
+            upper=1,
+            dims=("subjects", "dbs"),
+        )
+
+        # alpha for alpha determining the variance of the beta distribution, only use a single global parameter
+        alpha_alpha = pm.Uniform("alpha_alpha", lower=1.5, upper=20.0)
+
+        # given mean and alpha of beta distribution, compute beta
+        alpha_beta = pm.Deterministic(
+            "alpha_beta",
+            alpha_alpha / alpha_mean_per_subject - alpha_alpha,
+            dims=("subjects", "dbs"),
+        )
+
+        # finally draw alpha from beta distribution
         alpha = pm.Beta(
             "alpha",
-            alpha=mu_alpha * sig_alpha,
-            beta=(1.0 - mu_alpha) * sig_alpha,
-            dims="subjects",
+            alpha=alpha_alpha,
+            beta=alpha_beta,
+            dims=("subjects", "dbs"),
         )
 
-        # hierarchical deviation of learning rate paramter for DBS ON data
-        mu_alpha_dev = pm.Normal("mu_alpha_dev", mu=0.0, sigma=0.2)
-        sig_alpha_dev = pm.Exponential("sig_alpha_dev", lam=10)
-        alpha_dev = pm.Normal(
-            "alpha_dev", mu=mu_alpha_dev, sigma=sig_alpha_dev, dims="subjects"
+        # mean for beta globally
+        beta_mean_global = my_Gamma(
+            "beta_mean_global",
+            mu=2.5,
+            sigma=1.0,
         )
+        beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # deterministic computation of the learning rate for DBS ON data
-        alpha_dbs_on = pm.Deterministic(
-            "alpha_dbs_on", pt.clip(alpha + alpha_dev, 0.0, 1.0), dims="subjects"
+        # mean for beta per dbs condition from global
+        beta_mean_per_dbs = my_Gamma(
+            "beta_mean_per_dbs",
+            mu=beta_mean_global,
+            sigma=beta_sig_global,
+            dims="dbs",
         )
+        beta_sig_per_dbs = pm.Exponential("beta_sig_per_dbs", lam=5, dims="dbs")
 
-        # hierarchical inverse temperature parameter for DBS OFF data
-        mu_beta = pm.Gamma("mu_beta", alpha=10.0, beta=1.0)
-        sig_beta = pm.Exponential("sig_beta", lam=1.0)
-        beta = pm.Gamma(
+        # beta per subject from per dbs condition
+        beta = my_Gamma(
             "beta",
-            alpha=mu_beta**2 / sig_beta,
-            beta=mu_beta / sig_beta,
-            dims="subjects",
-        )
-
-        # hierarchical deviation of inverse temperature parameter for DBS ON data
-        mu_beta_dev = pm.Normal("mu_beta_dev", mu=0.0, sigma=10.0)
-        sig_beta_dev = pm.Exponential("sig_beta_dev", lam=1)
-        beta_dev = pm.Normal(
-            "beta_dev", mu=mu_beta_dev, sigma=sig_beta_dev, dims="subjects"
-        )
-
-        # deterministic computation of the inverse temperature parameter for DBS ON data
-        beta_dbs_on = pm.Deterministic(
-            "beta_dbs_on", pt.clip(beta + beta_dev, 0.0, 1000.0), dims="subjects"
+            mu=beta_mean_per_dbs,
+            sigma=beta_sig_per_dbs,
+            dims=("subjects", "dbs"),
         )
 
         # compute the probability of selecting action 1 after each trial based on parameters
         action_is_one_probs = pm.Deterministic(
             "action_is_one_probs",
-            test(
+            get_probabilities_single(
                 coords,
-                [alpha, alpha_dbs_on],
-                [beta, beta_dbs_on],
+                alpha,
+                beta,
                 actions_arr,
                 rewards_arr,
             ),
         )
+
+        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+        # likelihood with the computed probabilities
         pm.Bernoulli(
             name="like",
             p=action_is_one_probs,
             observed=observed_data,
         )
 
-        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
-        # likelihood with the computed probabilities
-        # like = pm.Bernoulli(name="like", p=action_is_one_probs, observed=onserved_data)
-        # sample from the posterior
-        trace_single = pm.sample(random_seed=rng)
-        # compute the log likelihood of the model
-        pm.compute_log_likelihood(trace_single)
+        # sample from the prior
+        idata_single = pm.sample_prior_predictive(draws=2000, random_seed=rng)
 
     # plot model
-    pm.model_to_graphviz(m_bernoulli_single).render("model_bernoulli")
+    pm.model_to_graphviz(m_bernoulli_single).render(f"{save_folder}/single_model_plot")
+
+    # visualize the prior samples distribution
+    az.plot_density(
+        idata_single,
+        group="prior",
+        var_names=[
+            "alpha_mean_global",
+            "alpha_mean_per_dbs",
+            "alpha_mean_per_subject",
+            "alpha_alpha",
+            "alpha_beta",
+            "alpha",
+            "beta_mean_global",
+            "beta_mean_per_dbs",
+            "beta",
+        ],
+    )
+    plt.savefig(f"{save_folder}/single_prior_samples.png")
+
+    # sample the posterior
+    with m_bernoulli_single:
+        # sample from the posterior
+        idata_single.extend(pm.sample(random_seed=rng))
+        # compute the log likelihood of the model
+        pm.compute_log_likelihood(idata_single)
 
     # plot the posterior distributions
-    for var_name in ["alpha", "beta", "alpha_dbs_on", "beta_dbs_on"]:
+    for var_name in [
+        "alpha_mean_global",
+        "alpha_mean_per_dbs",
+        "alpha_mean_per_subject",
+        "alpha_alpha",
+        "alpha_beta",
+        "beta_mean_global",
+        "beta_mean_per_dbs",
+    ]:
         az.plot_posterior(
-            data=trace_single,
+            data=idata_single,
             var_names=[var_name],
         )
+        plt.savefig(f"{save_folder}/single_posterior_{var_name}.png")
 
+    # plot posterior of alpha with true values
+    az.plot_posterior(
+        data=idata_single,
+        var_names=["alpha"],
+        ref_val=true_alpha_2d.flatten().tolist(),
+    )
+    plt.savefig(f"{save_folder}/single_posterior_alpha.png")
+
+    # plot posterior of beta with true values
+    az.plot_posterior(
+        data=idata_single,
+        var_names=["beta"],
+        ref_val=true_beta_2d.flatten().tolist(),
+    )
+    plt.savefig(f"{save_folder}/single_posterior_beta.png")
+
+    # plot the forest plot
     ax = az.plot_forest(
-        trace_single,
-        var_names=["alpha", "beta", "alpha_dbs_on", "beta_dbs_on"],
+        idata_single,
+        var_names=["alpha", "beta"],
         r_hat=True,
         combined=True,
         figsize=(6, 18),
     )
-    plt.show()
-
-    quit()
-
-    coords = {
-        "dbs": range(actions.shape[0]),
-        "subjects": range(actions.shape[1]),
-        "trials": range(actions.shape[2]),
-    }
-
-    # model with single learning rate
-    with pm.Model(coords=coords) as m_bernoulli_single_hierarchical:
-        # observed data
-        actions_data = pm.Data("actions_data", actions)
-        rewards_data = pm.Data("rewards_data", rewards)
-
-        # hierarchical learning rate paramter for DBS OFF data
-        mu_alpha = pm.Uniform("mu_alpha", lower=0.0, upper=1.0)
-        sig_alpha_log = pm.Exponential("sig_alpha_log", lam=1.5)
-        sig_alpha = pm.Deterministic("sig_alpha", pt.exp(sig_alpha_log))
-        alpha = pm.Beta(
-            "alpha",
-            alpha=mu_alpha * sig_alpha,
-            beta=(1.0 - mu_alpha) * sig_alpha,
-            dims="subjects",
-        )
-
-        # hierarchical deviation of learning rate paramter for DBS ON data
-        mu_alpha_dev = pm.Normal("mu_alpha_dev", mu=0.0, sigma=0.2)
-        sig_alpha_dev = pm.Exponential("sig_alpha_dev", lam=10)
-        alpha_dev = pm.Normal(
-            "alpha_dev", mu=mu_alpha_dev, sigma=sig_alpha_dev, dims="subjects"
-        )
-
-        # deterministic computation of the learning rate for DBS ON data
-        alpha_dbs_on = pm.Deterministic(
-            "alpha_dbs_on", pt.clip(alpha + alpha_dev, 0.0, 1.0)
-        )
-
-        # hierarchical inverse temperature parameter for DBS OFF data
-        mu_beta = pm.Gamma("mu_beta", alpha=10.0, beta=2.0)
-        sig_beta = pm.Exponential("sig_beta", lam=1.0)
-        beta = pm.Gamma(
-            "beta",
-            alpha=mu_beta**2 / sig_beta,
-            beta=mu_beta / sig_beta,
-            dims="subjects",
-        )
-
-        # hierarchical deviation of inverse temperature parameter for DBS ON data
-        mu_beta_dev = pm.Normal("mu_beta_dev", mu=0.0, sigma=1.0)
-        sig_beta_dev = pm.Exponential("sig_beta_dev", lam=5)
-        beta_dev = pm.Normal(
-            "beta_dev", mu=mu_beta_dev, sigma=sig_beta_dev, dims="subjects"
-        )
-
-        # deterministic computation of the inverse temperature parameter for DBS ON data
-        beta_dbs_on = pm.Deterministic(
-            "beta_dbs_on", pt.clip(beta + beta_dev, 0.0, None)
-        )
-
-        # compute the probability of selecting action 1 after each trial
-        action_is_one_probs = pm.Deterministic(
-            "action_is_one_probs",
-            get_action_is_one_probs_single(alpha, beta, actions, rewards),
-        )
-        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
-        # likelihood with the computed probabilities
-        like = pm.Bernoulli(name="like", p=action_is_one_probs, observed=actions[1:])
-        # sample from the posterior
-        trace_single = pm.sample(random_seed=rng)
-        # compute the log likelihood of the model
-        pm.compute_log_likelihood(trace_single)
+    plt.savefig(f"{save_folder}/single_forest_plot.png")
 
     # model with two learning rates
-    with pm.Model() as m_bernoulli:
-        alpha_plus = pm.Beta(name="alpha_plus", alpha=1, beta=1)
-        alpha_minus = pm.Beta(name="alpha_minus", alpha=1, beta=1)
-        beta = pm.HalfNormal(name="beta", sigma=10)
+    with pm.Model(coords=coords) as m_bernoulli_double:
+        # observed data
+        observed_data = pm.Data("observed_data", observed_arr)
+
+        # mean for alpha plus globally
+        alpha_plus_mean_global = pm.TruncatedNormal(
+            "alpha_plus_mean_global",
+            mu=0.3,
+            sigma=0.15,
+            lower=0,
+            upper=1,
+        )
+        alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=10)
+
+        # mean for alpha_plus per dbs condition from global
+        alpha_plus_mean_per_dbs = pm.TruncatedNormal(
+            "alpha_plus_mean_per_dbs",
+            mu=alpha_plus_mean_global,
+            sigma=alpha_plus_sig_global,
+            lower=0,
+            upper=1,
+            dims="dbs",
+        )
+        alpha_plus_sig_per_dbs = pm.Exponential(
+            "alpha_plus_sig_per_dbs", lam=10, dims="dbs"
+        )
+
+        # mean for alpha_plus per subject from per dbs condition
+        alpha_plus_mean_per_subject = pm.TruncatedNormal(
+            "alpha_plus_mean_per_subject",
+            mu=alpha_plus_mean_per_dbs,
+            sigma=alpha_plus_sig_per_dbs,
+            lower=0,
+            upper=1,
+            dims=("subjects", "dbs"),
+        )
+
+        # alpha for alpha_plus determining the variance of the beta distribution, only use a single global parameter
+        alpha_plus_alpha = pm.Uniform("alpha_plus_alpha", lower=1.5, upper=20.0)
+
+        # given mean and alpha of beta distribution, compute beta
+        alpha_plus_beta = pm.Deterministic(
+            "alpha_plus_beta",
+            alpha_plus_alpha / alpha_plus_mean_per_subject - alpha_plus_alpha,
+            dims=("subjects", "dbs"),
+        )
+
+        # finally draw alpha_plus from beta distribution
+        alpha_plus = pm.Beta(
+            "alpha_plus",
+            alpha=alpha_plus_alpha,
+            beta=alpha_plus_beta,
+            dims=("subjects", "dbs"),
+        )
+
+        # mean for alpha plus globally
+        alpha_minus_mean_global = pm.TruncatedNormal(
+            "alpha_minus_mean_global",
+            mu=0.3,
+            sigma=0.15,
+            lower=0,
+            upper=1,
+        )
+        alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=10)
+
+        # mean for alpha_minus per dbs condition from global
+        alpha_minus_mean_per_dbs = pm.TruncatedNormal(
+            "alpha_minus_mean_per_dbs",
+            mu=alpha_minus_mean_global,
+            sigma=alpha_minus_sig_global,
+            lower=0,
+            upper=1,
+            dims="dbs",
+        )
+        alpha_minus_sig_per_dbs = pm.Exponential(
+            "alpha_minus_sig_per_dbs", lam=10, dims="dbs"
+        )
+
+        # mean for alpha_minus per subject from per dbs condition
+        alpha_minus_mean_per_subject = pm.TruncatedNormal(
+            "alpha_minus_mean_per_subject",
+            mu=alpha_minus_mean_per_dbs,
+            sigma=alpha_minus_sig_per_dbs,
+            lower=0,
+            upper=1,
+            dims=("subjects", "dbs"),
+        )
+
+        # alpha for alpha_minus determining the variance of the beta distribution, only use a single global parameter
+        alpha_minus_alpha = pm.Uniform("alpha_minus_alpha", lower=1.5, upper=20.0)
+
+        # given mean and alpha of beta distribution, compute beta
+        alpha_minus_beta = pm.Deterministic(
+            "alpha_minus_beta",
+            alpha_minus_alpha / alpha_minus_mean_per_subject - alpha_minus_alpha,
+            dims=("subjects", "dbs"),
+        )
+
+        # finally draw alpha_minus from beta distribution
+        alpha_minus = pm.Beta(
+            "alpha_minus",
+            alpha=alpha_minus_alpha,
+            beta=alpha_minus_beta,
+            dims=("subjects", "dbs"),
+        )
+
+        # mean for beta globally
+        beta_mean_global = my_Gamma(
+            "beta_mean_global",
+            mu=2.5,
+            sigma=1.0,
+        )
+        beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
+
+        # mean for beta per dbs condition from global
+        beta_mean_per_dbs = my_Gamma(
+            "beta_mean_per_dbs",
+            mu=beta_mean_global,
+            sigma=beta_sig_global,
+            dims="dbs",
+        )
+        beta_sig_per_dbs = pm.Exponential("beta_sig_per_dbs", lam=5, dims="dbs")
+
+        # beta per subject from per dbs condition
+        beta = my_Gamma(
+            "beta",
+            mu=beta_mean_per_dbs,
+            sigma=beta_sig_per_dbs,
+            dims=("subjects", "dbs"),
+        )
+
+        # compute the probability of selecting action 1 after each trial based on parameters
         action_is_one_probs = pm.Deterministic(
             "action_is_one_probs",
-            get_action_is_one_probs(alpha_plus, alpha_minus, beta, actions, rewards),
+            get_probabilities_double(
+                coords,
+                alpha_plus,
+                alpha_minus,
+                beta,
+                actions_arr,
+                rewards_arr,
+            ),
         )
-        like = pm.Bernoulli(name="like", p=action_is_one_probs, observed=actions[1:])
-        trace = pm.sample(random_seed=rng)
-        pm.compute_log_likelihood(trace)
+
+        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+        # likelihood with the computed probabilities
+        pm.Bernoulli(
+            name="like",
+            p=action_is_one_probs,
+            observed=observed_data,
+        )
+
+        # sample from the prior
+        idata_double = pm.sample_prior_predictive(draws=2000, random_seed=rng)
+
+    # plot model
+    pm.model_to_graphviz(m_bernoulli_double).render(f"{save_folder}/double_model_plot")
+
+    # visualize the prior samples distribution
+    az.plot_density(
+        idata_double,
+        group="prior",
+        var_names=[
+            "alpha_plus_mean_global",
+            "alpha_plus_mean_per_dbs",
+            "alpha_plus_mean_per_subject",
+            "alpha_plus_alpha",
+            "alpha_plus_beta",
+            "alpha_plus",
+            "alpha_minus_mean_global",
+            "alpha_minus_mean_per_dbs",
+            "alpha_minus_mean_per_subject",
+            "alpha_minus_alpha",
+            "alpha_minus_beta",
+            "alpha_minus",
+            "beta_mean_global",
+            "beta_mean_per_dbs",
+            "beta",
+        ],
+    )
+    plt.savefig(f"{save_folder}/double_prior_samples.png")
+
+    # sample the posterior
+    with m_bernoulli_double:
+        # sample from the posterior
+        idata_double.extend(pm.sample(random_seed=rng))
+        # compute the log likelihood of the model
+        pm.compute_log_likelihood(idata_double)
+
+    # plot the posterior distributions
+    for var_name in [
+        "alpha_plus_mean_global",
+        "alpha_plus_mean_per_dbs",
+        "alpha_plus_mean_per_subject",
+        "alpha_plus_alpha",
+        "alpha_plus_beta",
+        "alpha_minus_mean_global",
+        "alpha_minus_mean_per_dbs",
+        "alpha_minus_mean_per_subject",
+        "alpha_minus_alpha",
+        "alpha_minus_beta",
+        "beta_mean_global",
+        "beta_mean_per_dbs",
+    ]:
+        az.plot_posterior(
+            data=idata_double,
+            var_names=[var_name],
+        )
+        plt.savefig(f"{save_folder}/double_posterior_{var_name}.png")
+
+    # plot posterior of alpha_plus with true values
+    az.plot_posterior(
+        data=idata_double,
+        var_names=["alpha_plus"],
+        ref_val=true_alpha_2d.flatten().tolist(),
+    )
+    plt.savefig(f"{save_folder}/double_posterior_alpha_plus.png")
+
+    # plot posterior of alpha_minus with true values
+    az.plot_posterior(
+        data=idata_double,
+        var_names=["alpha_minus"],
+        ref_val=true_alpha_2d.flatten().tolist(),
+    )
+    plt.savefig(f"{save_folder}/double_posterior_alpha_minus.png")
+
+    # plot posterior of beta with true values
+    az.plot_posterior(
+        data=idata_double,
+        var_names=["beta"],
+        ref_val=true_beta_2d.flatten().tolist(),
+    )
+    plt.savefig(f"{save_folder}/double_posterior_beta.png")
+
+    # plot the forest plot
+    ax = az.plot_forest(
+        idata_double,
+        var_names=["alpha_plus", "alpha_minus", "beta"],
+        r_hat=True,
+        combined=True,
+        figsize=(6, 18),
+    )
+    plt.savefig(f"{save_folder}/double_forest_plot.png")
 
     # model comparison using LOO (Leave-One-Out cross-validation)
-    df_comp_loo = az.compare({"m_bernoulli_single": trace_single, "m_bernoulli": trace})
-    print(df_comp_loo)
+    df_comp_loo = az.compare(
+        {"m_bernoulli_single": idata_single, "m_bernoulli_double": idata_double}
+    )
+    # print the comparison table in a text file
+    with open(f"{save_folder}/model_comparison.txt", "w") as f:
+        f.write(str(df_comp_loo))
 
     # plot results of the model comparison
     az.plot_compare(df_comp_loo, insample_dev=False)
-
-    # plot the posterior distributions of the parameters for the model with two learning
-    # rates
-    az.plot_trace(
-        data=trace,
-        var_names=["alpha_plus", "alpha_minus", "beta"],
-    )
-    az.plot_posterior(
-        data=trace,
-        var_names=["alpha_plus", "alpha_minus", "beta"],
-        ref_val=[true_alpha_plus, true_alpha_minus, true_beta],
-    )
-    # plot the model
-    pm.model_to_graphviz(m_bernoulli).render("model_bernoulli")
-    plt.show()
+    plt.savefig(f"{save_folder}/model_comparison.png")
