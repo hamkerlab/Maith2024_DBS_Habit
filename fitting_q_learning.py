@@ -456,6 +456,89 @@ def my_Gamma(name, mu, sigma, dims=None):
     )
 
 
+def analyze_model(
+    name,
+    model,
+    save_folder,
+    rng,
+    true_alpha_plus_2d,
+    true_alpha_minus_2d,
+    true_beta_2d,
+    chains,
+    tune,
+    draws,
+    draws_prior,
+):
+    # plot model
+    pm.model_to_graphviz(model).render(f"{save_folder}/{name}_model_plot")
+
+    # sample the prior
+    with model:
+        idata = pm.sample_prior_predictive(draws=draws_prior, random_seed=rng)
+
+    # visualize the prior samples distribution
+    for var_name in idata.prior.data_vars:
+        # skip deterministic variables
+        if var_name == "action_is_one_probs":
+            continue
+        az.plot_density(
+            idata,
+            group="prior",
+            var_names=[var_name],
+        )
+        plt.savefig(f"{save_folder}/{name}_prior_samples_{var_name}.png")
+        plt.close("all")
+
+    # sample the posterior
+    with model:
+        # sample from the posterior
+        idata.extend(pm.sample(random_seed=rng, chains=chains, tune=tune, draws=draws))
+        # compute the log likelihood of the model
+        pm.compute_log_likelihood(idata)
+
+    # plot the posterior distributions
+    for var_name in idata.posterior.data_vars:
+        # skip deterministic variables
+        if var_name == "action_is_one_probs":
+            continue
+        if var_name == "alpha":
+            ref_val = true_alpha_plus_2d.flatten().tolist()
+        elif var_name == "alpha_plus":
+            ref_val = true_alpha_plus_2d.flatten().tolist()
+        elif var_name == "alpha_minus":
+            ref_val = true_alpha_minus_2d.flatten().tolist()
+        elif var_name == "beta":
+            ref_val = true_beta_2d.flatten().tolist()
+        else:
+            ref_val = None
+        az.plot_posterior(
+            data=idata,
+            var_names=[var_name],
+            ref_val=ref_val,
+        )
+        plt.savefig(f"{save_folder}/{name}_posterior_{var_name}.png")
+        plt.close("all")
+
+    # plot the forest plot
+    az.plot_forest(
+        idata,
+        var_names=["alpha", "beta"],
+        r_hat=True,
+        combined=True,
+        figsize=(6, 18),
+    )
+    plt.savefig(f"{save_folder}/{name}_forest_plot.png")
+    plt.close("all")
+
+    # print the summary of the model
+    az.summary(idata).to_csv(f"{save_folder}/{name}_summary.csv")
+
+    # save inference data
+    idata.to_netcdf(f"{save_folder}/{name}_idata.nc")
+
+    return idata
+
+
 if __name__ == "__main__":
     save_folder = "results_fitting_q_learning"
     if not os.path.exists(save_folder):
@@ -465,7 +548,7 @@ if __name__ == "__main__":
     rng = np.random.default_rng(seed)
 
     # generate data using the true parameters
-    n_subjects = 1
+    n_subjects = 14
     true_alpha = np.clip(rng.normal(loc=0.3, scale=0.05, size=n_subjects), 0.01, 1.0)
     true_alpha_plus = true_alpha
     true_alpha_minus = np.clip(true_alpha + 0.15, 0.01, 1.0)
@@ -487,7 +570,7 @@ if __name__ == "__main__":
     for dbs in [0, 1]:
         for subject in range(n_subjects):
 
-            n = 10 + rng.integers(-2, 2)
+            n = 100 + rng.integers(-20, 20)
 
             actions, rewards, _ = generate_data_q_learn(
                 rng,
@@ -513,7 +596,7 @@ if __name__ == "__main__":
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # mean for alpha globally
+        # Group-level mean and standard deviation for learning rate
         alpha_mean_global = pm.TruncatedNormal(
             "alpha_mean_global",
             mu=0.3,
@@ -523,46 +606,40 @@ if __name__ == "__main__":
         )
         alpha_sig_global = pm.Exponential("alpha_sig_global", lam=10)
 
-        # mean for alpha per dbs condition from global
-        alpha_mean_per_dbs = pm.TruncatedNormal(
-            "alpha_mean_per_dbs",
-            mu=alpha_mean_global,
+        # Fixed effect (offset) of dbs on learning rate
+        alpha_dbs_effect = pm.Normal("alpha_dbs_effect", mu=0.0, sigma=0.1)
+
+        # Random offsets for each subject for learning rate
+        alpha_subject_offsets = pm.Normal(
+            "alpha_subject_offsets", mu=0, sigma=0.1, dims="subjects"
+        )
+
+        # Random effect (offset) of dbs for each subject on learning rate
+        alpha_subject_dbs_effect = pm.Normal(
+            "alpha_subject_dbs_effect", mu=0, sigma=0.1, dims="subjects"
+        )
+
+        # Calculate learning rate for each subject in each dbs condition
+        alpha = pm.TruncatedNormal(
+            "alpha",
+            mu=pt.clip(
+                alpha_mean_global
+                + (alpha_dbs_effect * pt.arange(len(coords["dbs"])))
+                + alpha_subject_offsets.dimshuffle(0, "x")
+                + (
+                    alpha_subject_dbs_effect.dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                ),
+                0.01,
+                1.0,
+            ),
             sigma=alpha_sig_global,
             lower=0,
             upper=1,
-            dims="dbs",
-        )
-        alpha_sig_per_dbs = pm.Exponential("alpha_sig_per_dbs", lam=10, dims="dbs")
-
-        # mean for alpha per subject from per dbs condition
-        alpha_mean_per_subject = pm.TruncatedNormal(
-            "alpha_mean_per_subject",
-            mu=alpha_mean_per_dbs,
-            sigma=alpha_sig_per_dbs,
-            lower=0,
-            upper=1,
             dims=("subjects", "dbs"),
         )
 
-        # alpha for alpha determining the variance of the beta distribution, only use a single global parameter
-        alpha_alpha = pm.Uniform("alpha_alpha", lower=1.5, upper=20.0)
-
-        # given mean and alpha of beta distribution, compute beta
-        alpha_beta = pm.Deterministic(
-            "alpha_beta",
-            alpha_alpha / alpha_mean_per_subject - alpha_alpha,
-            dims=("subjects", "dbs"),
-        )
-
-        # finally draw alpha from beta distribution
-        alpha = pm.Beta(
-            "alpha",
-            alpha=alpha_alpha,
-            beta=alpha_beta,
-            dims=("subjects", "dbs"),
-        )
-
-        # mean for beta globally
+        # Group-level mean and standard deviation for inverse temperature
         beta_mean_global = my_Gamma(
             "beta_mean_global",
             mu=2.5,
@@ -570,20 +647,34 @@ if __name__ == "__main__":
         )
         beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # mean for beta per dbs condition from global
-        beta_mean_per_dbs = my_Gamma(
-            "beta_mean_per_dbs",
-            mu=beta_mean_global,
-            sigma=beta_sig_global,
-            dims="dbs",
-        )
-        beta_sig_per_dbs = pm.Exponential("beta_sig_per_dbs", lam=5, dims="dbs")
+        # Fixed effect (offset) of dbs on inverse temperature
+        beta_dbs_effect = pm.Normal("beta_dbs_effect", mu=0, sigma=0.8)
 
-        # beta per subject from per dbs condition
+        # Random offsets for each subject for inverse temperature
+        beta_subject_offsets = pm.Normal(
+            "beta_subject_offsets", mu=0, sigma=0.8, dims="subjects"
+        )
+
+        # Random effect (offset) of dbs for each subject on inverse temperature
+        beta_subject_dbs_effect = pm.Normal(
+            "beta_subject_dbs_effect", mu=0, sigma=0.8, dims="subjects"
+        )
+
+        # Calculate inverse temperature for each subject in each dbs condition
         beta = my_Gamma(
             "beta",
-            mu=beta_mean_per_dbs,
-            sigma=beta_sig_per_dbs,
+            mu=pt.clip(
+                beta_mean_global
+                + (beta_dbs_effect * pt.arange(len(coords["dbs"])))
+                + beta_subject_offsets.dimshuffle(0, "x")
+                + (
+                    beta_subject_dbs_effect.dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                ),
+                0.01,
+                1000.0,
+            ),
+            sigma=beta_sig_global,
             dims=("subjects", "dbs"),
         )
 
@@ -607,86 +698,26 @@ if __name__ == "__main__":
             observed=observed_data,
         )
 
-        # sample from the prior
-        idata_single = pm.sample_prior_predictive(draws=2000, random_seed=rng)
-
-    # plot model
-    pm.model_to_graphviz(m_bernoulli_single).render(f"{save_folder}/single_model_plot")
-
-    # visualize the prior samples distribution
-    for var_name in [
-        "alpha_mean_global",
-        "alpha_mean_per_dbs",
-        "alpha_mean_per_subject",
-        "alpha_alpha",
-        "alpha_beta",
-        "alpha",
-        "beta_mean_global",
-        "beta_mean_per_dbs",
-        "beta",
-    ]:
-        az.plot_density(
-            idata_single,
-            group="prior",
-            var_names=[var_name],
-        )
-        plt.savefig(f"{save_folder}/single_prior_samples_{var_name}.png")
-
-    # sample the posterior
-    with m_bernoulli_single:
-        # sample from the posterior
-        idata_single.extend(pm.sample(random_seed=rng))
-        # compute the log likelihood of the model
-        pm.compute_log_likelihood(idata_single)
-
-    # plot the posterior distributions
-    for var_name in [
-        "alpha_mean_global",
-        "alpha_mean_per_dbs",
-        "alpha_mean_per_subject",
-        "alpha_alpha",
-        "alpha_beta",
-        "beta_mean_global",
-        "beta_mean_per_dbs",
-    ]:
-        az.plot_posterior(
-            data=idata_single,
-            var_names=[var_name],
-        )
-        plt.savefig(f"{save_folder}/single_posterior_{var_name}.png")
-
-    # plot posterior of alpha with true values
-    az.plot_posterior(
-        data=idata_single,
-        var_names=["alpha"],
-        ref_val=true_alpha_plus_2d.flatten().tolist(),
+    idata_single = analyze_model(
+        name="single",
+        model=m_bernoulli_single,
+        save_folder=save_folder,
+        rng=rng,
+        true_alpha_plus_2d=true_alpha_plus_2d,
+        true_alpha_minus_2d=true_alpha_minus_2d,
+        true_beta_2d=true_beta_2d,
+        chains=4,
+        tune=7000,
+        draws=15000,
+        draws_prior=2000,
     )
-    plt.savefig(f"{save_folder}/single_posterior_alpha.png")
-
-    # plot posterior of beta with true values
-    az.plot_posterior(
-        data=idata_single,
-        var_names=["beta"],
-        ref_val=true_beta_2d.flatten().tolist(),
-    )
-    plt.savefig(f"{save_folder}/single_posterior_beta.png")
-
-    # plot the forest plot
-    ax = az.plot_forest(
-        idata_single,
-        var_names=["alpha", "beta"],
-        r_hat=True,
-        combined=True,
-        figsize=(6, 18),
-    )
-    plt.savefig(f"{save_folder}/single_forest_plot.png")
 
     # model with two learning rates
     with pm.Model(coords=coords) as m_bernoulli_double:
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # mean for alpha plus globally
+        # Group-level mean and standard deviation for positive learning rate
         alpha_plus_mean_global = pm.TruncatedNormal(
             "alpha_plus_mean_global",
             mu=0.3,
@@ -696,48 +727,40 @@ if __name__ == "__main__":
         )
         alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=10)
 
-        # mean for alpha_plus per dbs condition from global
-        alpha_plus_mean_per_dbs = pm.TruncatedNormal(
-            "alpha_plus_mean_per_dbs",
-            mu=alpha_plus_mean_global,
+        # Fixed effect (offset) of dbs on positive learning rate
+        alpha_plus_dbs_effect = pm.Normal("alpha_plus_dbs_effect", mu=0.0, sigma=0.1)
+
+        # Random offsets for each subject for positive learning rate
+        alpha_plus_subject_offsets = pm.Normal(
+            "alpha_plus_subject_offsets", mu=0, sigma=0.1, dims="subjects"
+        )
+
+        # Random effect (offset) of dbs for each subject on positive learning rate
+        alpha_plus_subject_dbs_effect = pm.Normal(
+            "alpha_plus_subject_dbs_effect", mu=0, sigma=0.1, dims="subjects"
+        )
+
+        # Calculate positive learning rate for each subject in each dbs condition
+        alpha_plus = pm.TruncatedNormal(
+            "alpha_plus",
+            mu=pt.clip(
+                alpha_plus_mean_global
+                + (alpha_plus_dbs_effect * pt.arange(len(coords["dbs"])))
+                + alpha_plus_subject_offsets.dimshuffle(0, "x")
+                + (
+                    alpha_plus_subject_dbs_effect.dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                ),
+                0.01,
+                1.0,
+            ),
             sigma=alpha_plus_sig_global,
             lower=0,
             upper=1,
-            dims="dbs",
-        )
-        alpha_plus_sig_per_dbs = pm.Exponential(
-            "alpha_plus_sig_per_dbs", lam=10, dims="dbs"
-        )
-
-        # mean for alpha_plus per subject from per dbs condition
-        alpha_plus_mean_per_subject = pm.TruncatedNormal(
-            "alpha_plus_mean_per_subject",
-            mu=alpha_plus_mean_per_dbs,
-            sigma=alpha_plus_sig_per_dbs,
-            lower=0,
-            upper=1,
             dims=("subjects", "dbs"),
         )
 
-        # alpha for alpha_plus determining the variance of the beta distribution, only use a single global parameter
-        alpha_plus_alpha = pm.Uniform("alpha_plus_alpha", lower=1.5, upper=20.0)
-
-        # given mean and alpha of beta distribution, compute beta
-        alpha_plus_beta = pm.Deterministic(
-            "alpha_plus_beta",
-            alpha_plus_alpha / alpha_plus_mean_per_subject - alpha_plus_alpha,
-            dims=("subjects", "dbs"),
-        )
-
-        # finally draw alpha_plus from beta distribution
-        alpha_plus = pm.Beta(
-            "alpha_plus",
-            alpha=alpha_plus_alpha,
-            beta=alpha_plus_beta,
-            dims=("subjects", "dbs"),
-        )
-
-        # mean for alpha plus globally
+        # Group-level mean and standard deviation for negative learning rate
         alpha_minus_mean_global = pm.TruncatedNormal(
             "alpha_minus_mean_global",
             mu=0.3,
@@ -747,48 +770,40 @@ if __name__ == "__main__":
         )
         alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=10)
 
-        # mean for alpha_minus per dbs condition from global
-        alpha_minus_mean_per_dbs = pm.TruncatedNormal(
-            "alpha_minus_mean_per_dbs",
-            mu=alpha_minus_mean_global,
+        # Fixed effect (offset) of dbs on negative learning rate
+        alpha_minus_dbs_effect = pm.Normal("alpha_minus_dbs_effect", mu=0.0, sigma=0.1)
+
+        # Random offsets for each subject for negative learning rate
+        alpha_minus_subject_offsets = pm.Normal(
+            "alpha_minus_subject_offsets", mu=0, sigma=0.1, dims="subjects"
+        )
+
+        # Random effect (offset) of dbs for each subject on negative learning rate
+        alpha_minus_subject_dbs_effect = pm.Normal(
+            "alpha_minus_subject_dbs_effect", mu=0, sigma=0.1, dims="subjects"
+        )
+
+        # Calculate negative learning rate for each subject in each dbs condition
+        alpha_minus = pm.TruncatedNormal(
+            "alpha_minus",
+            mu=pt.clip(
+                alpha_minus_mean_global
+                + (alpha_minus_dbs_effect * pt.arange(len(coords["dbs"])))
+                + alpha_minus_subject_offsets.dimshuffle(0, "x")
+                + (
+                    alpha_minus_subject_dbs_effect.dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                ),
+                0.01,
+                1.0,
+            ),
             sigma=alpha_minus_sig_global,
             lower=0,
             upper=1,
-            dims="dbs",
-        )
-        alpha_minus_sig_per_dbs = pm.Exponential(
-            "alpha_minus_sig_per_dbs", lam=10, dims="dbs"
-        )
-
-        # mean for alpha_minus per subject from per dbs condition
-        alpha_minus_mean_per_subject = pm.TruncatedNormal(
-            "alpha_minus_mean_per_subject",
-            mu=alpha_minus_mean_per_dbs,
-            sigma=alpha_minus_sig_per_dbs,
-            lower=0,
-            upper=1,
             dims=("subjects", "dbs"),
         )
 
-        # alpha for alpha_minus determining the variance of the beta distribution, only use a single global parameter
-        alpha_minus_alpha = pm.Uniform("alpha_minus_alpha", lower=1.5, upper=20.0)
-
-        # given mean and alpha of beta distribution, compute beta
-        alpha_minus_beta = pm.Deterministic(
-            "alpha_minus_beta",
-            alpha_minus_alpha / alpha_minus_mean_per_subject - alpha_minus_alpha,
-            dims=("subjects", "dbs"),
-        )
-
-        # finally draw alpha_minus from beta distribution
-        alpha_minus = pm.Beta(
-            "alpha_minus",
-            alpha=alpha_minus_alpha,
-            beta=alpha_minus_beta,
-            dims=("subjects", "dbs"),
-        )
-
-        # mean for beta globally
+        # Group-level mean and standard deviation for inverse temperature
         beta_mean_global = my_Gamma(
             "beta_mean_global",
             mu=2.5,
@@ -796,20 +811,34 @@ if __name__ == "__main__":
         )
         beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # mean for beta per dbs condition from global
-        beta_mean_per_dbs = my_Gamma(
-            "beta_mean_per_dbs",
-            mu=beta_mean_global,
-            sigma=beta_sig_global,
-            dims="dbs",
-        )
-        beta_sig_per_dbs = pm.Exponential("beta_sig_per_dbs", lam=5, dims="dbs")
+        # Fixed effect (offset) of dbs on inverse temperature
+        beta_dbs_effect = pm.Normal("beta_dbs_effect", mu=0, sigma=0.8)
 
-        # beta per subject from per dbs condition
+        # Random offsets for each subject for inverse temperature
+        beta_subject_offsets = pm.Normal(
+            "beta_subject_offsets", mu=0, sigma=0.8, dims="subjects"
+        )
+
+        # Random effect (offset) of dbs for each subject on inverse temperature
+        beta_subject_dbs_effect = pm.Normal(
+            "beta_subject_dbs_effect", mu=0, sigma=0.8, dims="subjects"
+        )
+
+        # Calculate inverse temperature for each subject in each dbs condition
         beta = my_Gamma(
             "beta",
-            mu=beta_mean_per_dbs,
-            sigma=beta_sig_per_dbs,
+            mu=pt.clip(
+                beta_mean_global
+                + (beta_dbs_effect * pt.arange(len(coords["dbs"])))
+                + beta_subject_offsets.dimshuffle(0, "x")
+                + (
+                    beta_subject_dbs_effect.dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                ),
+                0.01,
+                1000.0,
+            ),
+            sigma=beta_sig_global,
             dims=("subjects", "dbs"),
         )
 
@@ -834,98 +863,19 @@ if __name__ == "__main__":
             observed=observed_data,
         )
 
-        # sample from the prior
-        idata_double = pm.sample_prior_predictive(draws=2000, random_seed=rng)
-
-    # plot model
-    pm.model_to_graphviz(m_bernoulli_double).render(f"{save_folder}/double_model_plot")
-
-    # visualize the prior samples distribution
-    for var_name in [
-        "alpha_plus_mean_global",
-        "alpha_plus_mean_per_dbs",
-        "alpha_plus_mean_per_subject",
-        "alpha_plus_alpha",
-        "alpha_plus_beta",
-        "alpha_plus",
-        "alpha_minus_mean_global",
-        "alpha_minus_mean_per_dbs",
-        "alpha_minus_mean_per_subject",
-        "alpha_minus_alpha",
-        "alpha_minus_beta",
-        "alpha_minus",
-        "beta_mean_global",
-        "beta_mean_per_dbs",
-        "beta",
-    ]:
-        az.plot_density(
-            idata_double,
-            group="prior",
-            var_names=[var_name],
-        )
-        plt.savefig(f"{save_folder}/double_prior_samples_{var_name}.png")
-
-    # sample the posterior
-    with m_bernoulli_double:
-        # sample from the posterior
-        idata_double.extend(pm.sample(random_seed=rng))
-        # compute the log likelihood of the model
-        pm.compute_log_likelihood(idata_double)
-
-    # plot the posterior distributions
-    for var_name in [
-        "alpha_plus_mean_global",
-        "alpha_plus_mean_per_dbs",
-        "alpha_plus_mean_per_subject",
-        "alpha_plus_alpha",
-        "alpha_plus_beta",
-        "alpha_minus_mean_global",
-        "alpha_minus_mean_per_dbs",
-        "alpha_minus_mean_per_subject",
-        "alpha_minus_alpha",
-        "alpha_minus_beta",
-        "beta_mean_global",
-        "beta_mean_per_dbs",
-    ]:
-        az.plot_posterior(
-            data=idata_double,
-            var_names=[var_name],
-        )
-        plt.savefig(f"{save_folder}/double_posterior_{var_name}.png")
-
-    # plot posterior of alpha_plus with true values
-    az.plot_posterior(
-        data=idata_double,
-        var_names=["alpha_plus"],
-        ref_val=true_alpha_plus_2d.flatten().tolist(),
+    idata_double = analyze_model(
+        name="double",
+        model=m_bernoulli_single,
+        save_folder=save_folder,
+        rng=rng,
+        true_alpha_plus_2d=true_alpha_plus_2d,
+        true_alpha_minus_2d=true_alpha_minus_2d,
+        true_beta_2d=true_beta_2d,
+        chains=4,
+        tune=7000,
+        draws=15000,
+        draws_prior=2000,
     )
-    plt.savefig(f"{save_folder}/double_posterior_alpha_plus.png")
-
-    # plot posterior of alpha_minus with true values
-    az.plot_posterior(
-        data=idata_double,
-        var_names=["alpha_minus"],
-        ref_val=true_alpha_minus_2d.flatten().tolist(),
-    )
-    plt.savefig(f"{save_folder}/double_posterior_alpha_minus.png")
-
-    # plot posterior of beta with true values
-    az.plot_posterior(
-        data=idata_double,
-        var_names=["beta"],
-        ref_val=true_beta_2d.flatten().tolist(),
-    )
-    plt.savefig(f"{save_folder}/double_posterior_beta.png")
-
-    # plot the forest plot
-    ax = az.plot_forest(
-        idata_double,
-        var_names=["alpha_plus", "alpha_minus", "beta"],
-        r_hat=True,
-        combined=True,
-        figsize=(6, 18),
-    )
-    plt.savefig(f"{save_folder}/double_forest_plot.png")
 
     # model comparison using LOO (Leave-One-Out cross-validation)
     df_comp_loo = az.compare(

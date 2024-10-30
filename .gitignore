@@ -44,3 +44,7 @@ fig/*
 
 statistic/*
 !statistic/place_holder_statistic
+
+results_fitting_q_learning/*
+
+tmp.py
