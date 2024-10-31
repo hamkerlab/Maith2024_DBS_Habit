@@ -522,7 +522,11 @@ def analyze_model(
     # plot the forest plot
     az.plot_forest(
         idata,
-        var_names=["alpha", "beta"],
+        var_names=(
+            ["alpha", "beta"]
+            if "alpha" in idata.posterior.data_vars
+            else ["alpha_plus", "alpha_minus", "beta"]
+        ),
         r_hat=True,
         combined=True,
         figsize=(6, 18),
@@ -541,10 +545,13 @@ def analyze_model(
 
 if __name__ == "__main__":
     save_folder = "results_fitting_q_learning"
+    seed = 123
+    tune = 7000
+    draws = 15000
+    draws_prior = 2000
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
     az.style.use("arviz-darkgrid")
-    seed = 123
     rng = np.random.default_rng(seed)
 
     # generate data using the true parameters
@@ -600,42 +607,53 @@ if __name__ == "__main__":
         alpha_mean_global = pm.TruncatedNormal(
             "alpha_mean_global",
             mu=0.3,
-            sigma=0.15,
+            sigma=0.1,
+            lower=0.1,
+            upper=0.6,
+        )
+        alpha_sig_global = pm.Exponential("alpha_sig_global", lam=60)
+
+        # Group-level mean and standard deviation for the change of learning rate by dbs
+        alpha_dbs_effect_mean_global = pm.Normal(
+            "alpha_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        )
+        alpha_dbs_effect_sig_global = pm.Exponential(
+            "alpha_dbs_effect_sig_global", lam=50
+        )
+
+        # subject-level learning rate
+        alpha_subject = pm.TruncatedNormal(
+            "alpha_subject",
+            mu=alpha_mean_global,
+            sigma=alpha_sig_global,
             lower=0,
             upper=1,
-        )
-        alpha_sig_global = pm.Exponential("alpha_sig_global", lam=10)
-
-        # Fixed effect (offset) of dbs on learning rate
-        alpha_dbs_effect = pm.Normal("alpha_dbs_effect", mu=0.0, sigma=0.1)
-
-        # Random offsets for each subject for learning rate
-        alpha_subject_offsets = pm.Normal(
-            "alpha_subject_offsets", mu=0, sigma=0.1, dims="subjects"
+            dims="subjects",
         )
 
-        # Random effect (offset) of dbs for each subject on learning rate
-        alpha_subject_dbs_effect = pm.Normal(
-            "alpha_subject_dbs_effect", mu=0, sigma=0.1, dims="subjects"
+        # subject-level change of learning rate by dbs
+        alpha_subject_dbs_effect = pm.TruncatedNormal(
+            "alpha_subject_dbs_effect",
+            mu=alpha_dbs_effect_mean_global,
+            sigma=alpha_dbs_effect_sig_global,
+            lower=-1,
+            upper=1,
+            dims="subjects",
         )
 
         # Calculate learning rate for each subject in each dbs condition
-        alpha = pm.TruncatedNormal(
+        alpha = pm.Deterministic(
             "alpha",
-            mu=pt.clip(
-                alpha_mean_global
-                + (alpha_dbs_effect * pt.arange(len(coords["dbs"])))
-                + alpha_subject_offsets.dimshuffle(0, "x")
-                + (
-                    alpha_subject_dbs_effect.dimshuffle(0, "x")
+            pt.clip(
+                alpha_subject.dimshuffle(0, "x")
+                * (
+                    1
+                    + alpha_subject_dbs_effect.dimshuffle(0, "x")
                     * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
                 ),
                 0.01,
                 1.0,
             ),
-            sigma=alpha_sig_global,
-            lower=0,
-            upper=1,
             dims=("subjects", "dbs"),
         )
 
@@ -647,34 +665,46 @@ if __name__ == "__main__":
         )
         beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # Fixed effect (offset) of dbs on inverse temperature
-        beta_dbs_effect = pm.Normal("beta_dbs_effect", mu=0, sigma=0.8)
-
-        # Random offsets for each subject for inverse temperature
-        beta_subject_offsets = pm.Normal(
-            "beta_subject_offsets", mu=0, sigma=0.8, dims="subjects"
+        # Group-level mean and standard deviation for the change of inverse temperature
+        # by dbs
+        beta_dbs_effect_mean_global = pm.Normal(
+            "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        )
+        beta_dbs_effect_sig_global = pm.Exponential(
+            "beta_dbs_effect_sig_global", lam=50
         )
 
-        # Random effect (offset) of dbs for each subject on inverse temperature
-        beta_subject_dbs_effect = pm.Normal(
-            "beta_subject_dbs_effect", mu=0, sigma=0.8, dims="subjects"
+        # subject-level inverse temperature
+        beta_subject = my_Gamma(
+            "beta_subject",
+            mu=beta_mean_global,
+            sigma=beta_sig_global,
+            dims="subjects",
+        )
+
+        # subject-level change of inverse temperature by dbs
+        beta_subject_dbs_effect = pm.TruncatedNormal(
+            "beta_subject_dbs_effect",
+            mu=beta_dbs_effect_mean_global,
+            sigma=beta_dbs_effect_sig_global,
+            lower=-1,
+            upper=1,
+            dims="subjects",
         )
 
         # Calculate inverse temperature for each subject in each dbs condition
-        beta = my_Gamma(
+        beta = pm.Deterministic(
             "beta",
-            mu=pt.clip(
-                beta_mean_global
-                + (beta_dbs_effect * pt.arange(len(coords["dbs"])))
-                + beta_subject_offsets.dimshuffle(0, "x")
-                + (
-                    beta_subject_dbs_effect.dimshuffle(0, "x")
+            pt.clip(
+                beta_subject.dimshuffle(0, "x")
+                * (
+                    1
+                    + beta_subject_dbs_effect.dimshuffle(0, "x")
                     * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
                 ),
                 0.01,
                 1000.0,
             ),
-            sigma=beta_sig_global,
             dims=("subjects", "dbs"),
         )
 
@@ -707,9 +737,9 @@ if __name__ == "__main__":
         true_alpha_minus_2d=true_alpha_minus_2d,
         true_beta_2d=true_beta_2d,
         chains=4,
-        tune=7000,
-        draws=15000,
-        draws_prior=2000,
+        tune=tune,
+        draws=draws,
+        draws_prior=draws_prior,
     )
 
     # model with two learning rates
@@ -717,89 +747,111 @@ if __name__ == "__main__":
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # Group-level mean and standard deviation for positive learning rate
+        # Group-level mean and standard deviation for learning rate
         alpha_plus_mean_global = pm.TruncatedNormal(
             "alpha_plus_mean_global",
             mu=0.3,
-            sigma=0.15,
-            lower=0,
-            upper=1,
+            sigma=0.1,
+            lower=0.1,
+            upper=0.6,
         )
-        alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=10)
+        alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=60)
 
-        # Fixed effect (offset) of dbs on positive learning rate
-        alpha_plus_dbs_effect = pm.Normal("alpha_plus_dbs_effect", mu=0.0, sigma=0.1)
-
-        # Random offsets for each subject for positive learning rate
-        alpha_plus_subject_offsets = pm.Normal(
-            "alpha_plus_subject_offsets", mu=0, sigma=0.1, dims="subjects"
+        # Group-level mean and standard deviation for the change of learning rate by dbs
+        alpha_plus_dbs_effect_mean_global = pm.Normal(
+            "alpha_plus_dbs_effect_mean_global", mu=0.0, sigma=0.2
         )
-
-        # Random effect (offset) of dbs for each subject on positive learning rate
-        alpha_plus_subject_dbs_effect = pm.Normal(
-            "alpha_plus_subject_dbs_effect", mu=0, sigma=0.1, dims="subjects"
+        alpha_plus_dbs_effect_sig_global = pm.Exponential(
+            "alpha_plus_dbs_effect_sig_global", lam=50
         )
 
-        # Calculate positive learning rate for each subject in each dbs condition
-        alpha_plus = pm.TruncatedNormal(
-            "alpha_plus",
-            mu=pt.clip(
-                alpha_plus_mean_global
-                + (alpha_plus_dbs_effect * pt.arange(len(coords["dbs"])))
-                + alpha_plus_subject_offsets.dimshuffle(0, "x")
-                + (
-                    alpha_plus_subject_dbs_effect.dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                ),
-                0.01,
-                1.0,
-            ),
+        # subject-level learning rate
+        alpha_plus_subject = pm.TruncatedNormal(
+            "alpha_plus_subject",
+            mu=alpha_plus_mean_global,
             sigma=alpha_plus_sig_global,
             lower=0,
             upper=1,
-            dims=("subjects", "dbs"),
+            dims="subjects",
         )
 
-        # Group-level mean and standard deviation for negative learning rate
-        alpha_minus_mean_global = pm.TruncatedNormal(
-            "alpha_minus_mean_global",
-            mu=0.3,
-            sigma=0.15,
-            lower=0,
+        # subject-level change of learning rate by dbs
+        alpha_plus_subject_dbs_effect = pm.TruncatedNormal(
+            "alpha_plus_subject_dbs_effect",
+            mu=alpha_plus_dbs_effect_mean_global,
+            sigma=alpha_plus_dbs_effect_sig_global,
+            lower=-1,
             upper=1,
-        )
-        alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=10)
-
-        # Fixed effect (offset) of dbs on negative learning rate
-        alpha_minus_dbs_effect = pm.Normal("alpha_minus_dbs_effect", mu=0.0, sigma=0.1)
-
-        # Random offsets for each subject for negative learning rate
-        alpha_minus_subject_offsets = pm.Normal(
-            "alpha_minus_subject_offsets", mu=0, sigma=0.1, dims="subjects"
+            dims="subjects",
         )
 
-        # Random effect (offset) of dbs for each subject on negative learning rate
-        alpha_minus_subject_dbs_effect = pm.Normal(
-            "alpha_minus_subject_dbs_effect", mu=0, sigma=0.1, dims="subjects"
-        )
-
-        # Calculate negative learning rate for each subject in each dbs condition
-        alpha_minus = pm.TruncatedNormal(
-            "alpha_minus",
-            mu=pt.clip(
-                alpha_minus_mean_global
-                + (alpha_minus_dbs_effect * pt.arange(len(coords["dbs"])))
-                + alpha_minus_subject_offsets.dimshuffle(0, "x")
-                + (
-                    alpha_minus_subject_dbs_effect.dimshuffle(0, "x")
+        # Calculate learning rate for each subject in each dbs condition
+        alpha_plus = pm.Deterministic(
+            "alpha_plus",
+            pt.clip(
+                alpha_plus_subject.dimshuffle(0, "x")
+                * (
+                    1
+                    + alpha_plus_subject_dbs_effect.dimshuffle(0, "x")
                     * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
                 ),
                 0.01,
                 1.0,
             ),
+            dims=("subjects", "dbs"),
+        )
+
+        # Group-level mean and standard deviation for learning rate
+        alpha_minus_mean_global = pm.TruncatedNormal(
+            "alpha_minus_mean_global",
+            mu=0.3,
+            sigma=0.1,
+            lower=0.1,
+            upper=0.6,
+        )
+        alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=60)
+
+        # Group-level mean and standard deviation for the change of learning rate by dbs
+        alpha_minus_dbs_effect_mean_global = pm.Normal(
+            "alpha_minus_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        )
+        alpha_minus_dbs_effect_sig_global = pm.Exponential(
+            "alpha_minus_dbs_effect_sig_global", lam=50
+        )
+
+        # subject-level learning rate
+        alpha_minus_subject = pm.TruncatedNormal(
+            "alpha_minus_subject",
+            mu=alpha_minus_mean_global,
             sigma=alpha_minus_sig_global,
             lower=0,
             upper=1,
+            dims="subjects",
+        )
+
+        # subject-level change of learning rate by dbs
+        alpha_minus_subject_dbs_effect = pm.TruncatedNormal(
+            "alpha_minus_subject_dbs_effect",
+            mu=alpha_minus_dbs_effect_mean_global,
+            sigma=alpha_minus_dbs_effect_sig_global,
+            lower=-1,
+            upper=1,
+            dims="subjects",
+        )
+
+        # Calculate learning rate for each subject in each dbs condition
+        alpha_minus = pm.Deterministic(
+            "alpha_minus",
+            pt.clip(
+                alpha_minus_subject.dimshuffle(0, "x")
+                * (
+                    1
+                    + alpha_minus_subject_dbs_effect.dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                ),
+                0.01,
+                1.0,
+            ),
             dims=("subjects", "dbs"),
         )
 
@@ -811,34 +863,46 @@ if __name__ == "__main__":
         )
         beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # Fixed effect (offset) of dbs on inverse temperature
-        beta_dbs_effect = pm.Normal("beta_dbs_effect", mu=0, sigma=0.8)
-
-        # Random offsets for each subject for inverse temperature
-        beta_subject_offsets = pm.Normal(
-            "beta_subject_offsets", mu=0, sigma=0.8, dims="subjects"
+        # Group-level mean and standard deviation for the change of inverse temperature
+        # by dbs
+        beta_dbs_effect_mean_global = pm.Normal(
+            "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        )
+        beta_dbs_effect_sig_global = pm.Exponential(
+            "beta_dbs_effect_sig_global", lam=50
         )
 
-        # Random effect (offset) of dbs for each subject on inverse temperature
-        beta_subject_dbs_effect = pm.Normal(
-            "beta_subject_dbs_effect", mu=0, sigma=0.8, dims="subjects"
+        # subject-level inverse temperature
+        beta_subject = my_Gamma(
+            "beta_subject",
+            mu=beta_mean_global,
+            sigma=beta_sig_global,
+            dims="subjects",
+        )
+
+        # subject-level change of inverse temperature by dbs
+        beta_subject_dbs_effect = pm.TruncatedNormal(
+            "beta_subject_dbs_effect",
+            mu=beta_dbs_effect_mean_global,
+            sigma=beta_dbs_effect_sig_global,
+            lower=-1,
+            upper=1,
+            dims="subjects",
         )
 
         # Calculate inverse temperature for each subject in each dbs condition
-        beta = my_Gamma(
+        beta = pm.Deterministic(
             "beta",
-            mu=pt.clip(
-                beta_mean_global
-                + (beta_dbs_effect * pt.arange(len(coords["dbs"])))
-                + beta_subject_offsets.dimshuffle(0, "x")
-                + (
-                    beta_subject_dbs_effect.dimshuffle(0, "x")
+            pt.clip(
+                beta_subject.dimshuffle(0, "x")
+                * (
+                    1
+                    + beta_subject_dbs_effect.dimshuffle(0, "x")
                     * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
                 ),
                 0.01,
                 1000.0,
             ),
-            sigma=beta_sig_global,
             dims=("subjects", "dbs"),
         )
 
@@ -865,16 +929,16 @@ if __name__ == "__main__":
 
     idata_double = analyze_model(
         name="double",
-        model=m_bernoulli_single,
+        model=m_bernoulli_double,
         save_folder=save_folder,
         rng=rng,
         true_alpha_plus_2d=true_alpha_plus_2d,
         true_alpha_minus_2d=true_alpha_minus_2d,
         true_beta_2d=true_beta_2d,
         chains=4,
-        tune=7000,
-        draws=15000,
-        draws_prior=2000,
+        tune=tune,
+        draws=draws,
+        draws_prior=draws_prior,
     )
 
     # model comparison using LOO (Leave-One-Out cross-validation)
