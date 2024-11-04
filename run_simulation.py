@@ -1,12 +1,16 @@
 import subprocess
 import visualization as vis
 import statistic as stat
+from CompNeuroPy import run_script_parallel
+import sys
+
+N_JOBS = int(sys.argv[1])
 
 ###################################################################################################################
 ############################################### record data #######################################################
 ###################################################################################################################
 # get simulation data
-get_simulation_data = False
+get_simulation_data = True
 
 # get activity change data -> firing rates for one trial
 get_activity_change_data = False
@@ -93,6 +97,8 @@ def run_sim(parameter, step, dbs_param_state):
     skript_name = "simulation.py"
 
     if dbs_alone == True and shortcut_alone == True:
+        # create args_list
+        args_list = []
         for k in range(number_of_persons):
             arg1 = str(k)
             arg2 = str(dbs_states - 1)
@@ -105,9 +111,7 @@ def run_sim(parameter, step, dbs_param_state):
             arg9 = str(step)
             arg10 = str(save_mean_GPi)
             arg11 = str(dbs_param_state)
-            command = [
-                "python",
-                skript_name,
+            args = [
                 arg1,
                 arg2,
                 arg3,
@@ -120,20 +124,14 @@ def run_sim(parameter, step, dbs_param_state):
                 arg10,
                 arg11,
             ]
-            subprocess.run(command)
+            args_list.append(args)
+        run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
     else:
+        # create args_list
+        args_list = []
         for i in range(shortcut):
             for j in range(dbs_states):
                 for k in range(number_of_persons):
-
-                    # if j > 0 and i == 0:
-                    #    continue
-
-                    print(
-                        "\n",
-                        f"start simulate shortcut{i}_dbs-state{j}_simulation{k}",
-                        "\n",
-                    )
                     arg1 = str(k)
                     arg2 = str(j)
                     arg3 = str(i)
@@ -145,9 +143,7 @@ def run_sim(parameter, step, dbs_param_state):
                     arg9 = str(step)
                     arg10 = str(save_mean_GPi)
                     arg11 = str(dbs_param_state)
-                    command = [
-                        "python",
-                        skript_name,
+                    args = [
                         arg1,
                         arg2,
                         arg3,
@@ -160,7 +156,8 @@ def run_sim(parameter, step, dbs_param_state):
                         arg10,
                         arg11,
                     ]
-                    subprocess.run(command)
+                    args_list.append(args)
+        run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
 
 
 #####################################################################################################

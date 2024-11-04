@@ -35,7 +35,9 @@ clear()
 baseline_dopa = Constant("baseline_dopa", params["baseline_dopa"])
 
 
-def create_network(seed, dbs_state, shortcut, parameter, dbs_param_state):
+def create_network(
+    seed, dbs_state, shortcut, parameter, dbs_param_state, ann_compile_str="annarchy"
+):
     ######################### Setup ANNarchy function ############################
 
     # load seed parameters
@@ -773,7 +775,7 @@ def create_network(seed, dbs_state, shortcut, parameter, dbs_param_state):
     )
 
     ########################### compile network #############################
-    compile()
+    compile(directory=ann_compile_str)
 
     populations = [
         IT,

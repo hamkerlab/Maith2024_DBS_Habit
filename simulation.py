@@ -10,6 +10,7 @@ import random
 
 seed = int(sys.argv[1]) + 17112023  # 17112023 = Date
 random.seed(seed)
+ann_compile_str = "annarchy_" + sys.argv[1] + sys.argv[2] + sys.argv[3]
 
 
 ############################### Reset #################################
@@ -298,7 +299,12 @@ def simulate():
     ######################### compile BG_Modell ##############################
 
     populations = BG.create_network(
-        seed, dbs_state, shortcut, parameter, dbs_param_state
+        seed,
+        dbs_state,
+        shortcut,
+        parameter,
+        dbs_param_state,
+        ann_compile_str=ann_compile_str,
     )
 
     ####################### get population parameters ########################
