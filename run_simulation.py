@@ -1,7 +1,7 @@
 import subprocess
 import visualization as vis
 import statistic as stat
-from CompNeuroPy import run_script_parallel
+from Parallel import run_script_parallel
 import sys
 
 N_JOBS = int(sys.argv[1])
