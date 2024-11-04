@@ -10,7 +10,7 @@ import random
 
 seed = int(sys.argv[1]) + 17112023  # 17112023 = Date
 random.seed(seed)
-ann_compile_str = "annarchy_" + sys.argv[1] + sys.argv[2] + sys.argv[3]
+ann_compile_str = f"annarchy_{sys.argv[1]}_{sys.argv[2]}_{sys.argv[3]}"
 
 
 ############################### Reset #################################
