@@ -166,6 +166,7 @@ def run_sim(parameter, step, dbs_param_state):
 
     simulation_data_combined = {}
     parameter_data_combined = {}
+    mean_gpi_data_combined = {}
     # loop over all conducted simulations
     for args in args_list:
         (
@@ -182,16 +183,22 @@ def run_sim(parameter, step, dbs_param_state):
             arg11,
         ) = args
 
+        # define how the arguments are used in simulation.py
+        dbs_state = int(arg2)
+        column = int(arg1)
+        step = int(arg9)
+        save_parameter_data = arg8
+        shortcut = int(arg3)
+        save_data = arg6
+        save_mean_GPi = arg10
+
         # simulation_data
         # check if save_data saved something (based on
         # if save_data == "True":
         # in simulation.py)
-        if arg6 == "True":
+        if save_data == "True":
             # load the file (name based on simulation.py) and add it to combined data
             # as if the combined data would be created sequentially
-            shortcut = int(arg3)
-            dbs_state = int(arg2)
-            column = int(arg1)
             filepath = f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}.json"
             # the key is the file which was created sequentially before
             key = f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}.json"
@@ -204,10 +211,6 @@ def run_sim(parameter, step, dbs_param_state):
         # check if save_parameter saved something (based on
         # if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
         # in simulation.py)
-        dbs_state = int(arg2)
-        column = int(arg1)
-        step = int(arg9)
-        save_parameter_data = arg8
         if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
             # Results files (see save_parameter function from simulation.py)
             if dbs_state == 1:
@@ -248,6 +251,50 @@ def run_sim(parameter, step, dbs_param_state):
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
 
+        # mean gpi data
+        # check if save_GPi_r saved something (based on
+        # if save_mean_GPi == "True" and dbs_state > 0 and dbs_state < 5
+        # in simulation.py)
+        if save_mean_GPi == "True" and dbs_state > 0 and dbs_state < 5:
+            # Average rate files (see save_GPi_r function from simulation.py)
+            if dbs_state == 1:
+                filepath = f"data/gpi_scatter_data/1_suppression/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/gpi_scatter_data/1_suppression/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+            if dbs_state == 2:
+                filepath = f"data/gpi_scatter_data/2_efferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/gpi_scatter_data/2_efferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+            if dbs_state == 3:
+                filepath = f"data/gpi_scatter_data/3_afferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/gpi_scatter_data/3_afferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+            if dbs_state == 4:
+                filepath = f"data/gpi_scatter_data/4_passing_fibres/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/gpi_scatter_data/4_passing_fibres/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+
+            data = pd.read_json(filepath, orient="records", lines=True)
+            if key not in mean_gpi_data_combined.keys():
+                mean_gpi_data_combined[key] = pd.DataFrame({})
+            mean_gpi_data_combined[key][column] = data[0]
+
+            # Scatter data files (see save_GPi_r function from simulation.py)
+            if column == 0:
+                if dbs_state == 1:
+                    filepath = f"data/gpi_scatter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/gpi_scatter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+                if dbs_state == 2:
+                    filepath = f"data/gpi_scatter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/gpi_scatter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+                if dbs_state == 3:
+                    filepath = f"data/gpi_scatter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/gpi_scatter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+                if dbs_state == 4:
+                    filepath = f"data/gpi_scatter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/gpi_scatter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+
+                data = pd.read_json(filepath, orient="records", lines=True)
+                if key not in mean_gpi_data_combined.keys():
+                    mean_gpi_data_combined[key] = pd.DataFrame({})
+                mean_gpi_data_combined[key][step] = data[0]
+
     # save simulation data combined
     for key, val in simulation_data_combined.items():
         val.to_json(
@@ -264,7 +311,13 @@ def run_sim(parameter, step, dbs_param_state):
             lines=True,
         )
 
-    # TODO  fix the data save_mean_GPi
+    # save mean gpi data combined
+    for key, val in mean_gpi_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
 
 
 #####################################################################################################

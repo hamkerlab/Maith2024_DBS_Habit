@@ -215,7 +215,6 @@ def save_parameter(success, dbs_state, shortcut, parameter):
 
         optimal_data = [parameter]
         df = pd.DataFrame(optimal_data)
-
         df.to_json(filepath, orient="records", lines=True)
 
 
@@ -233,44 +232,33 @@ def save_GPi_r(mean_GPi, dbs_state, shortcut, parameter):
     ####################### save average rate GPi #############################
 
     if dbs_state == 1:
-        filepath = f"data/gpi_scatter_data/1_suppression/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/1_suppression/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 2:
-        filepath = f"data/gpi_scatter_data/2_efferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/2_efferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 3:
-        filepath = f"data/gpi_scatter_data/3_afferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/3_afferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 4:
-        filepath = f"data/gpi_scatter_data/4_passing_fibres/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/4_passing_fibres/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
 
     mean_GPi = [mean_GPi]
     df = pd.DataFrame(mean_GPi)
-
-    if column == 0:
-        df.to_json(filepath, orient="records", lines=True)
-    else:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[column] = mean_GPi
-        data.to_json(filepath, orient="records", lines=True)
+    df.to_json(filepath, orient="records", lines=True)
 
     ############################ save gpi scatter data #################################
 
-    if dbs_state == 1:
-        filepath = f"data/gpi_scatter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 2:
-        filepath = f"data/gpi_scatter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 3:
-        filepath = f"data/gpi_scatter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 4:
-        filepath = f"data/gpi_scatter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+    if column == 0:
+        if dbs_state == 1:
+            filepath = f"data/gpi_scatter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 2:
+            filepath = f"data/gpi_scatter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 3:
+            filepath = f"data/gpi_scatter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 4:
+            filepath = f"data/gpi_scatter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
 
-    optimal_data = [parameter]
-    df = pd.DataFrame(optimal_data)
-
-    if column == 0 and step == 0:
+        optimal_data = [parameter]
+        df = pd.DataFrame(optimal_data)
         df.to_json(filepath, orient="records", lines=True)
-    elif column == 0 and step > 0:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[step] = optimal_data
-        data.to_json(filepath, orient="records", lines=True)
 
 
 ##############################################################################
@@ -279,7 +267,6 @@ def save_GPi_r(mean_GPi, dbs_state, shortcut, parameter):
 
 
 def simulate():
-    id = int(sys.argv[1])
     dbs_state = int(sys.argv[2])
     shortcut = int(sys.argv[3])
     parameter = float(sys.argv[7])
