@@ -5,28 +5,36 @@ from CompNeuroPy import run_script_parallel
 import sys
 import pandas as pd
 
+# This script's arguments:
+# first: how many cores to use for running simulaions in parallel
+# second: optional, integer that defines what is run (get simulaiton, or plot figures
+#   etc.), if not given the boolean values below define what is run
+
 N_JOBS = int(sys.argv[1])
+if len(sys.argv) == 3:
+    MODE = int(sys.argv[2])
+
 
 ###################################################################################################################
 ############################################### record data #######################################################
 ###################################################################################################################
 # get simulation data
-get_simulation_data = True
+get_simulation_data = False if len(sys.argv) < 3 else (MODE == 0)
 
 # get activity change data -> firing rates for one trial
-get_activity_change_data = False
+get_activity_change_data = False if len(sys.argv) < 3 else (MODE == 1)
 
 # get parameter data -> for suppression, efferent, afferent and passing-fibres
-get_dbs_parameter_data = False
+get_dbs_parameter_data = False if len(sys.argv) < 3 else (MODE == 2)
 
 # get load simulation data
-get_load_simulate_data = False
+get_load_simulate_data = False if len(sys.argv) < 3 else (MODE == 3)
 
 ###################################################################################################################
 ############################################### visualization #####################################################
 ###################################################################################################################
 # plot_figures = True -> create the images from the existing data without starting the simulation
-plot_figures = False
+plot_figures = False if len(sys.argv) < 3 else (MODE == 5)
 
 fig_shortcut_on_off = True
 fig_dbs_on_off_14_100 = True
@@ -42,14 +50,14 @@ fig_parameter_gpi_inhib = True
 ################################################### statistic #####################################################
 ###################################################################################################################
 # run_statistic = True -> create statistic data without starting the simulation
-run_statistic = False
+run_statistic = False if len(sys.argv) < 3 else (MODE == 4)
 
 check_H1 = True
 check_H2 = True
 check_H3 = True
 anova_load_simulation = True
 pairwise_ttest_load_simulation = True
-previously_selected = True
+previously_selected = False
 
 # Save means and standard errors
 save_mean_and_errors = True
