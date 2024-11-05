@@ -3,6 +3,7 @@ import visualization as vis
 import statistic as stat
 from CompNeuroPy import run_script_parallel
 import sys
+import pandas as pd
 
 N_JOBS = int(sys.argv[1])
 
@@ -158,6 +159,112 @@ def run_sim(parameter, step, dbs_param_state):
                     ]
                     args_list.append(args)
         run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
+
+    # combine the saved data which was previously created sequentially but now for
+    # run_script_parallel was adjusted (save everything separately) and now needs to
+    # be combined after all simulations
+
+    simulation_data_combined = {}
+    parameter_data_combined = {}
+    # loop over all conducted simulations
+    for args in args_list:
+        (
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+        ) = args
+
+        # simulation_data
+        # check if save_data saved something (based on
+        # if save_data == "True":
+        # in simulation.py)
+        if arg6 == "True":
+            # load the file (name based on simulation.py) and add it to combined data
+            # as if the combined data would be created sequentially
+            shortcut = int(arg3)
+            dbs_state = int(arg2)
+            column = int(arg1)
+            filepath = f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}.json"
+            # the key is the file which was created sequentially before
+            key = f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+            data = pd.read_json(filepath, orient="records", lines=True)
+            if key not in simulation_data_combined.keys():
+                simulation_data_combined[key] = pd.DataFrame({})
+            simulation_data_combined[key][column] = data[0]
+
+        # parameter_data (save_parameter fucntion from simulation.py)
+        # check if save_parameter saved something (based on
+        # if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
+        # in simulation.py)
+        dbs_state = int(arg2)
+        column = int(arg1)
+        step = int(arg9)
+        save_parameter_data = arg8
+        if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
+            # Results files (see save_parameter function from simulation.py)
+            if dbs_state == 1:
+                filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+            if dbs_state == 2:
+                filepath = f"data/parameter_data/2_efferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/parameter_data/2_efferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+            if dbs_state == 3:
+                filepath = f"data/parameter_data/3_afferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/parameter_data/3_afferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+            if dbs_state == 4:
+                filepath = f"data/parameter_data/4_passing_fibres/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
+                key = f"data/parameter_data/4_passing_fibres/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+
+            data = pd.read_json(filepath, orient="records", lines=True)
+            if key not in parameter_data_combined.keys():
+                parameter_data_combined[key] = pd.DataFrame({})
+            parameter_data_combined[key][column] = data[0]
+
+            # Param files (see save_parameter function from simulation.py)
+            if column == 0:
+                if dbs_state == 1:
+                    filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+                if dbs_state == 2:
+                    filepath = f"data/parameter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/parameter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+                if dbs_state == 3:
+                    filepath = f"data/parameter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/parameter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+                if dbs_state == 4:
+                    filepath = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+                    key = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+
+                data = pd.read_json(filepath, orient="records", lines=True)
+                if key not in parameter_data_combined.keys():
+                    parameter_data_combined[key] = pd.DataFrame({})
+                parameter_data_combined[key][step] = data[0]
+
+    # save simulation data combined
+    for key, val in simulation_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
+
+    # save parameter data combined
+    for key, val in parameter_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
+
+    # TODO  fix the data save_mean_GPi
 
 
 #####################################################################################################

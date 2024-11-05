@@ -153,15 +153,8 @@ def save_data(success, selected_list, dbs_state, shortcut, plastic_weights):
     save_data = sys.argv[6]
     if save_data == "True":
         # filename
-        filepath = (
-            f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-        )
-        if column == 0:
-            df.to_json(filepath, orient="records", lines=True)
-        else:
-            data = pd.read_json(filepath, orient="records", lines=True)
-            data[column] = success
-            data.to_json(filepath, orient="records", lines=True)
+        filepath = f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}.json"
+        df.to_json(filepath, orient="records", lines=True)
 
         # save success and selected_list separately using pickle
         import pickle
@@ -197,43 +190,33 @@ def save_parameter(success, dbs_state, shortcut, parameter):
     ################################ save data ################################
 
     if dbs_state == 1:
-        filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 2:
-        filepath = f"data/parameter_data/2_efferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/2_efferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 3:
-        filepath = f"data/parameter_data/3_afferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/3_afferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 4:
-        filepath = f"data/parameter_data/4_passing_fibres/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/4_passing_fibres/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
 
     df = pd.DataFrame(success)
-
-    if column == 0:
-        df.to_json(filepath, orient="records", lines=True)
-    else:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[column] = success
-        data.to_json(filepath, orient="records", lines=True)
+    df.to_json(filepath, orient="records", lines=True)
 
     ##################### save optimal param #####################
 
-    if dbs_state == 1:
-        filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 2:
-        filepath = f"data/parameter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 3:
-        filepath = f"data/parameter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 4:
-        filepath = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+    if column == 0:
+        if dbs_state == 1:
+            filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 2:
+            filepath = f"data/parameter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 3:
+            filepath = f"data/parameter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 4:
+            filepath = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
 
-    optimal_data = [parameter]
-    df = pd.DataFrame(optimal_data)
+        optimal_data = [parameter]
+        df = pd.DataFrame(optimal_data)
 
-    if column == 0 and step == 0:
         df.to_json(filepath, orient="records", lines=True)
-    elif column == 0 and step > 0:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[step] = optimal_data
-        data.to_json(filepath, orient="records", lines=True)
 
 
 ###############################################################################
