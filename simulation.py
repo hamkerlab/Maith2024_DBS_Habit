@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import sys
 import random
+from CompNeuroPy import save_variables
 
 
 ############################## fixed random values ##################################
@@ -143,7 +144,7 @@ def create_reward(anz_trials, p, zufall):
 ####################### save rewards per session ##############################
 
 
-def save_data(success, selected_list, dbs_state, shortcut):
+def save_data(success, selected_list, dbs_state, shortcut, plastic_weights):
     success = [int(x) for x in success]
 
     column = int(sys.argv[1])
@@ -171,7 +172,14 @@ def save_data(success, selected_list, dbs_state, shortcut):
         ) as f:
             pickle.dump({"rewards": success, "choices": selected_list}, f)
 
-        ### TODO this now saves choices and rewards per trial, now run again simulations to generate simulation data
+        # save plastic weights
+        save_variables(
+            variable_list=[plastic_weights],
+            name_list=[
+                f"plastic_weights_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}"
+            ],
+            path="data/simulation_data/",
+        )
 
 
 ###############################################################################
@@ -353,6 +361,7 @@ def simulate():
     StrD1_GPi_list = []
     step = np.linspace(0, anz_trials - 1, 5).astype(int)
     reward = create_reward(anz_trials, belohnungsverteilung, zufall)
+    plastic_weights = {}
 
     ############################# initial monitor ###############################
 
@@ -453,7 +462,10 @@ def simulate():
             recordings = monitor.get()
             monitor.stop()
 
-    save_data(success, selected_list, dbs_state, shortcut)
+        # at the end of each trial get the plastic weights
+        plastic_weights = BG.get_plastic_weights(plastic_weights)
+
+    save_data(success, selected_list, dbs_state, shortcut, plastic_weights)
 
     if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
         save_parameter(success, dbs_state, shortcut, parameter)

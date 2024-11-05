@@ -19,11 +19,13 @@ from ANNarchy import (
     setup,
     reset,
     clear,
+    projections,
 )
 from parameters import params
 import numpy as np
 from time import time
-from CompNeuroPy import DBSstimulator
+from CompNeuroPy import DBSstimulator, compile_in_folder
+import re
 
 ############################# clear network ##################################
 clear()
@@ -775,7 +777,7 @@ def create_network(
     )
 
     ########################### compile network #############################
-    compile(directory=ann_compile_str)
+    compile_in_folder(folder_name=ann_compile_str)
 
     populations = [
         IT,
@@ -835,6 +837,45 @@ class BGMonitor(object):
 
 
 ############################### record weigths ###############################
+
+
+def get_plastic_weights(data: dict):
+    """
+    Everytime called it stores the weights of the plastic projections in a dictionary
+    (keys = projection names, values = arrays with projection weights for each call).
+    The arrays have shape (n,) + projection.w.shape. Only works if projection.w can be
+    transformed into an array (e.g., for one-to-one or all-to-all connections).
+
+    Args:
+        data (dict):
+            Either empty dictionary or dictionary already containing arrays of weights
+            of the plastic projections.
+
+    Returns:
+        data (dict):
+            Dictionary with updated arrays.
+    """
+    # get the plastic projections
+    plastic_proj_list: list[Projection] = [
+        proj
+        for proj in projections()
+        if "dw" in re.sub(r"\s+", "", proj.synapse_type.equations)
+    ]
+
+    # create or append the dictionary entries for the projection weights
+    for proj in plastic_proj_list:
+        w = np.array(proj.w)
+        w = np.expand_dims(w, axis=0)
+        key = proj.name
+
+        if key in data:
+            # Concatenate along the first axis
+            data[key] = np.concatenate((data[key], w), axis=0)
+        else:
+            # Initialize with the first array
+            data[key] = w
+
+    return data
 
 
 def extract_data(
