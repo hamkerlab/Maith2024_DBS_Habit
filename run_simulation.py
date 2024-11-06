@@ -24,7 +24,7 @@ get_simulation_data = False if len(sys.argv) < 3 else (MODE == 0)
 get_activity_change_data = False if len(sys.argv) < 3 else (MODE == 1)
 
 # get parameter data -> for suppression, efferent, afferent and passing-fibres
-get_dbs_parameter_data = True if len(sys.argv) < 3 else (MODE == 2)
+get_dbs_parameter_data = False if len(sys.argv) < 3 else (MODE == 2)
 
 # get load simulation data
 get_load_simulate_data = False if len(sys.argv) < 3 else (MODE == 3)
@@ -187,9 +187,6 @@ def run_sim(parameter, step, dbs_param_state):
             arg11,
         ) = args
 
-        print(list(parameter_data_combined.keys()))
-        print("\n")
-
         # define how the arguments are used in simulation.py
         dbs_state = int(arg2)
         column = int(arg1)
@@ -309,30 +306,6 @@ def run_sim(parameter, step, dbs_param_state):
                 if key not in mean_gpi_data_combined.keys():
                     mean_gpi_data_combined[key] = pd.DataFrame({})
                 mean_gpi_data_combined[key][step] = data[0]
-
-    # save simulation data combined
-    for key, val in simulation_data_combined.items():
-        val.to_json(
-            key,
-            orient="records",
-            lines=True,
-        )
-
-    # save parameter data combined
-    for key, val in parameter_data_combined.items():
-        val.to_json(
-            key,
-            orient="records",
-            lines=True,
-        )
-
-    # save mean gpi data combined
-    for key, val in mean_gpi_data_combined.items():
-        val.to_json(
-            key,
-            orient="records",
-            lines=True,
-        )
 
 
 #####################################################################################################
@@ -527,6 +500,29 @@ if (
     parameter_data_combined = {}
     mean_gpi_data_combined = {}
     run_sim(parameter, 0, 0)
+    # save simulation data combined
+    for key, val in simulation_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
+
+    # save parameter data combined
+    for key, val in parameter_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
+
+    # save mean gpi data combined
+    for key, val in mean_gpi_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
 if (
     get_dbs_parameter_data == False
     and get_activity_change_data == True
@@ -549,6 +545,29 @@ if (
     parameter_data_combined = {}
     mean_gpi_data_combined = {}
     run_parameter()
+    # save simulation data combined
+    for key, val in simulation_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
+
+    # save parameter data combined
+    for key, val in parameter_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
+
+    # save mean gpi data combined
+    for key, val in mean_gpi_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
 if (
     get_dbs_parameter_data == False
     and get_activity_change_data == False
