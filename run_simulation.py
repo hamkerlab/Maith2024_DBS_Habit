@@ -258,11 +258,13 @@ def run_sim(parameter, step, dbs_param_state):
                 print(f"data from {filepath}:")
                 print(data)
                 print(f"append to parameter_data_combined[{key}]:")
+                print("keys before:")
                 print(list(parameter_data_combined.keys()))
-                print("\n")
                 if key not in parameter_data_combined.keys():
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
+                print("keys after:")
+                print(list(parameter_data_combined.keys()))
 
         # mean gpi data
         # check if save_GPi_r saved something (based on
