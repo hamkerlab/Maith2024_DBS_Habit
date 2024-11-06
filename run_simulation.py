@@ -1,4 +1,3 @@
-import subprocess
 import visualization as vis
 import statistic as stat
 from CompNeuroPy import run_script_parallel
@@ -25,7 +24,7 @@ get_simulation_data = False if len(sys.argv) < 3 else (MODE == 0)
 get_activity_change_data = False if len(sys.argv) < 3 else (MODE == 1)
 
 # get parameter data -> for suppression, efferent, afferent and passing-fibres
-get_dbs_parameter_data = False if len(sys.argv) < 3 else (MODE == 2)
+get_dbs_parameter_data = True if len(sys.argv) < 3 else (MODE == 2)
 
 # get load simulation data
 get_load_simulate_data = False if len(sys.argv) < 3 else (MODE == 3)
@@ -134,7 +133,7 @@ def run_sim(parameter, step, dbs_param_state):
                 arg11,
             ]
             args_list.append(args)
-        run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
+        # run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
     else:
         # create args_list
         args_list = []
@@ -166,7 +165,7 @@ def run_sim(parameter, step, dbs_param_state):
                         arg11,
                     ]
                     args_list.append(args)
-        run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
+        # run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
 
     # combine the saved data which was previously created sequentially but now for
     # run_script_parallel was adjusted (save everything separately) and now needs to
@@ -200,7 +199,7 @@ def run_sim(parameter, step, dbs_param_state):
         save_data = arg6
         save_mean_GPi = arg10
 
-        # simulation_data
+        # simulation_data # seems to work
         # check if save_data saved something (based on
         # if save_data == "True":
         # in simulation.py)
@@ -220,7 +219,7 @@ def run_sim(parameter, step, dbs_param_state):
         # if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
         # in simulation.py)
         if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
-            # Results files (see save_parameter function from simulation.py)
+            # Results files (see save_parameter function from simulation.py) # seems to work
             if dbs_state == 1:
                 filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
                 key = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
@@ -239,7 +238,7 @@ def run_sim(parameter, step, dbs_param_state):
                 parameter_data_combined[key] = pd.DataFrame({})
             parameter_data_combined[key][column] = data[0]
 
-            # Param files (see save_parameter function from simulation.py)
+            # Param files (see save_parameter function from simulation.py) # seems not to work
             if column == 0:
                 if dbs_state == 1:
                     filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
@@ -255,6 +254,9 @@ def run_sim(parameter, step, dbs_param_state):
                     key = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
 
                 data = pd.read_json(filepath, orient="records", lines=True)
+                print(f"data from {filepath}")
+                print(f"append to parameter_data_combined[{key}]:")
+                print(parameter_data_combined[key])
                 if key not in parameter_data_combined.keys():
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
@@ -433,7 +435,10 @@ def run_load_simulation():
     short = 2
     number_of_persons = 100
 
-    for save_load_simulate_data, conditions in [[True, 1], [False, 5]]:
+    for save_load_simulate_data, conditions in [
+        [True, 1],
+        [False, 5],
+    ]:  # TODO schaue auf cuneus ob results korrekt aussehen, dann starte komplet parallelized
         # create args_list
         args_list = []
         for condition in range(conditions):
