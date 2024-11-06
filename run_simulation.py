@@ -388,6 +388,8 @@ def run_activity_change():
     sessions = 2
     boxplots = False
 
+    # create args_list
+    args_list = []
     for i in range(sessions):
         for j in range(dbs):
             for n in range(number_of_persons):
@@ -396,16 +398,17 @@ def run_activity_change():
                 arg3 = str(i)
                 arg4 = str(boxplots)
                 arg5 = str(n)
-                command = [
-                    "python",
-                    "simulation_activity_change.py",
+                args = [
                     arg1,
                     arg2,
                     arg3,
                     arg4,
                     arg5,
                 ]
-                subprocess.run(command)
+                args_list.append(args)
+    run_script_parallel(
+        script_path="simulation_activity_change.py", n_jobs=N_JOBS, args_list=args_list
+    )
 
 
 #####################################################################################################
