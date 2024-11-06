@@ -43,6 +43,7 @@ fig_gpi_scatter = True
 fig_load_simulate = True
 fig_dbs_parameter = True
 fig_parameter_gpi_inhib = True
+fig_weights_over_time = True
 
 
 ###################################################################################################################
@@ -598,6 +599,9 @@ if plot_figures:
 
     if fig_parameter_gpi_inhib:
         vis.parameter_gpi_inhib()
+
+    if fig_weights_over_time:
+        vis.weights_over_time()
 
 
 #####################################################################################################

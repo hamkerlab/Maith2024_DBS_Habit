@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import statistic as stat
+from CompNeuroPy import load_variables
 
 #################################################################################################################
 ########################################### plot figures ########################################################
@@ -14,6 +15,7 @@ __fig_gpi_scatter__ = False
 __fig_load_simulate__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
+__fig_weights_over_time__ = True
 
 
 ##############################################################################
@@ -559,14 +561,6 @@ def activity_changes_dbs_on():
             x - 3 * width,
             x - 4.5 * width,
             x - 6 * width,
-        ]
-
-        labels = [
-            "suppression",
-            "efferent",
-            "passing-fibres",
-            "dbs-all",
-            # "dbs-off",
         ]
 
         label_y = [
@@ -1650,29 +1644,117 @@ def parameter_gpi_inhib():
 
 
 #################################################################################################################
+################################### __fig_weights_over_time__ ########################################
+#################################################################################################################
+
+
+def weights_over_time():
+    # we have weights for each sim (0-99), shortcut (0-fixed,1-plastic), dbs state
+    # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing,5-dbs-all)
+
+    # data/simulation_data/plastic_weights_Shortcut0_DBS_State0_sim0.pkl
+    name_list = []
+    for sim_id in range(1):
+        for dbs_state in range(1):
+            name_list.append(
+                f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
+            )
+    loaded_variables = load_variables(name_list=name_list, path="data/simulation_data/")
+
+    # in each loaded file we have these weight arrays:
+    # ITThal
+    # (120, 2, 2)
+    # ITStrD1
+    # (120, 4, 2)
+    # ITStrD2
+    # (120, 4, 2)
+    # ITSTN
+    # (120, 4, 2)
+    # StrD1SNc
+    # (120, 1, 4)
+    # StrD1GPi
+    # (120, 2, 4)
+    # STNGPi
+    # (120, 2, 4)
+    # StrD2GPe
+    # (120, 2, 4)
+
+    # TODOs:
+    # - matrix multiply
+    #   - ITStrD1 * StrD1GPi --> w_direct
+    #   - ITStrD2 * StrD2GPe * _GPeGPi --> w_indirect # _GPeGPi is a constant from parameters
+    #   - ITSTN * STNGPi --> w_hyperdirect
+    # - sort others
+    #   - ITThal --> w_shortcut
+    #   - StrD1SNc --> w_dopa_predict
+    # - average other indizes/neurons:
+    #   - w_direct, w_indirect, w_hyperdirect, w_shortcut --> over IT dimension
+    #   - w_dopa_predict --> over StrD1 dimension
+    # - store all w_ variables with indizes (sim_id, dbs_state)
+    # - get information about the reversal (0->1 or 1->0)
+    # - average over sim_ids but only whose with the same reversal
+
+    # old code for matrix multiplication
+    # wITSTNSNr=np.zeros((5,16,16))
+    # wITStrD1SNr=np.zeros((5,16,16))
+    # wITStrD2GPe=np.zeros((5,16,16))
+    # for folder, simIDs in simulations:
+    #     for simID in simIDs:
+    #         w_ITStrD1=np.load('../data/'+folder+'/w_ITStrD1'+str(simID)+'.npy')
+    #         w_ITStrD2=np.load('../data/'+folder+'/w_ITStrD2'+str(simID)+'.npy')
+    #         w_ITSTN=np.load('../data/'+folder+'/w_ITSTN'+str(simID)+'.npy')
+    #         w_StrD1SNr=np.load('../data/'+folder+'/w_StrD1SNr'+str(simID)+'.npy')
+    #         w_StrD2GPe=np.load('../data/'+folder+'/w_StrD2GPe'+str(simID)+'.npy')
+    #         w_STNSNr=np.load('../data/'+folder+'/w_STNSNr'+str(simID)+'.npy')
+
+    #         trials=0
+    #         for idx in range(w_StrD1SNr.shape[0]):
+    #             if w_StrD1SNr[idx,:,:].sum()!=0:
+    #                 trials+=1
+
+    #         for idx,t in enumerate([0,24,48,200,500]):
+    #             w1=np.transpose(w_ITSTN[t])
+    #             w2=np.transpose(w_STNSNr[t])
+    #             wITSTNSNr[idx]+=np.matmul(w1, w2)/float(num_simulations)
+
+    #             w1=np.transpose(w_ITStrD1[t])
+    #             w2=np.transpose(w_StrD1SNr[t])
+    #             wITStrD1SNr[idx]+=np.matmul(w1, w2)/float(num_simulations)
+
+    #             w1=np.transpose(w_ITStrD2[t])
+    #             w2=np.transpose(w_StrD2GPe[t])
+    #             wITStrD2GPe[idx]+=np.matmul(w1, w2)/float(num_simulations)
+    pass
+
+
+#################################################################################################################
 ########################################### function call #######################################################
 #################################################################################################################
 
-if __fig_shortcut_on_off__:
-    shortcut_on_off(True, 14)
+if __name__ == "__main__":
+    if __fig_shortcut_on_off__:
+        shortcut_on_off(True, 14)
 
-if __fig_dbs_on_off_14_and_100__:
-    dbs_on_off_14_and_100(True)
+    if __fig_dbs_on_off_14_and_100__:
+        dbs_on_off_14_and_100(True)
 
-if __fig_activity_changes_dbs_on__:
-    activity_changes_dbs_on()
+    if __fig_activity_changes_dbs_on__:
+        activity_changes_dbs_on()
 
-if __fig_activity_changes_dbs_off__:
-    activity_changes_dbs_off()
+    if __fig_activity_changes_dbs_off__:
+        activity_changes_dbs_off()
 
-if __fig_gpi_scatter__:
-    gpi_scatter()
+    if __fig_gpi_scatter__:
+        gpi_scatter()
 
-if __fig_load_simulate__:
-    load_simulate()
+    if __fig_load_simulate__:
+        load_simulate()
 
-if __fig_dbs_parameter__:
-    dbs_parameter()
+    if __fig_dbs_parameter__:
+        dbs_parameter()
 
-if __fig_parameter_gpi_inhib__:
-    parameter_gpi_inhib()
+    if __fig_parameter_gpi_inhib__:
+        parameter_gpi_inhib()
+
+    if __fig_weights_over_time__:
+        weights_over_time()
