@@ -133,7 +133,7 @@ def run_sim(parameter, step, dbs_param_state):
                 arg11,
             ]
             args_list.append(args)
-        # run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
+        run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
     else:
         # create args_list
         args_list = []
@@ -165,7 +165,7 @@ def run_sim(parameter, step, dbs_param_state):
                         arg11,
                     ]
                     args_list.append(args)
-        # run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
+        run_script_parallel(script_path=skript_name, n_jobs=N_JOBS, args_list=args_list)
 
     # combine the saved data which was previously created sequentially but now for
     # run_script_parallel was adjusted (save everything separately) and now needs to
@@ -196,7 +196,7 @@ def run_sim(parameter, step, dbs_param_state):
         save_data = arg6
         save_mean_GPi = arg10
 
-        # simulation_data # seems to work
+        # simulation_data
         # check if save_data saved something (based on
         # if save_data == "True":
         # in simulation.py)
@@ -216,7 +216,7 @@ def run_sim(parameter, step, dbs_param_state):
         # if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
         # in simulation.py)
         if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
-            # Results files (see save_parameter function from simulation.py) # seems to work
+            # Results files (see save_parameter function from simulation.py)
             if dbs_state == 1:
                 filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
                 key = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
@@ -235,7 +235,7 @@ def run_sim(parameter, step, dbs_param_state):
                 parameter_data_combined[key] = pd.DataFrame({})
             parameter_data_combined[key][column] = data[0]
 
-            # Param files (see save_parameter function from simulation.py) # seems not to work
+            # Param files (see save_parameter function from simulation.py)
             if column == 0:
                 if dbs_state == 1:
                     filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
@@ -251,17 +251,9 @@ def run_sim(parameter, step, dbs_param_state):
                     key = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
 
                 data = pd.read_json(filepath, orient="records", lines=True)
-                # print(f"dbs_state={dbs_state}")
-                # print(f"data from {filepath}:")
-                # print(data)
-                # print(f"append to parameter_data_combined[{key}]:")
-                # print("keys before:")
-                # print(list(parameter_data_combined.keys()))
                 if key not in parameter_data_combined.keys():
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
-                # print("keys after:")
-                # print(list(parameter_data_combined.keys()))
 
         # mean gpi data
         # check if save_GPi_r saved something (based on
