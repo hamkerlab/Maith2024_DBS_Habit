@@ -190,6 +190,9 @@ def run_sim(parameter, step, dbs_param_state):
             arg11,
         ) = args
 
+        print(list(parameter_data_combined.keys()))
+        print("\n")
+
         # define how the arguments are used in simulation.py
         dbs_state = int(arg2)
         column = int(arg1)
@@ -254,17 +257,17 @@ def run_sim(parameter, step, dbs_param_state):
                     key = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
 
                 data = pd.read_json(filepath, orient="records", lines=True)
-                print(f"dbs_state={dbs_state}")
-                print(f"data from {filepath}:")
-                print(data)
-                print(f"append to parameter_data_combined[{key}]:")
-                print("keys before:")
-                print(list(parameter_data_combined.keys()))
+                # print(f"dbs_state={dbs_state}")
+                # print(f"data from {filepath}:")
+                # print(data)
+                # print(f"append to parameter_data_combined[{key}]:")
+                # print("keys before:")
+                # print(list(parameter_data_combined.keys()))
                 if key not in parameter_data_combined.keys():
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
-                print("keys after:")
-                print(list(parameter_data_combined.keys()))
+                # print("keys after:")
+                # print(list(parameter_data_combined.keys()))
 
         # mean gpi data
         # check if save_GPi_r saved something (based on
