@@ -254,6 +254,7 @@ def run_sim(parameter, step, dbs_param_state):
                     key = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
 
                 data = pd.read_json(filepath, orient="records", lines=True)
+                print(f"dbs_state={dbs_state}")
                 print(f"data from {filepath}:")
                 print(data)
                 print(f"append to parameter_data_combined[{key}]:")
