@@ -256,7 +256,8 @@ def run_sim(parameter, step, dbs_param_state):
                 data = pd.read_json(filepath, orient="records", lines=True)
                 print(f"data from {filepath}")
                 print(f"append to parameter_data_combined[{key}]:")
-                print(parameter_data_combined[key])
+                if key in parameter_data_combined.keys():
+                    print(parameter_data_combined[key])
                 if key not in parameter_data_combined.keys():
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
