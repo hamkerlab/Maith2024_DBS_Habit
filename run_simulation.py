@@ -254,10 +254,11 @@ def run_sim(parameter, step, dbs_param_state):
                     key = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
 
                 data = pd.read_json(filepath, orient="records", lines=True)
-                print(f"data from {filepath}")
+                print(f"data from {filepath}:")
+                print(data)
                 print(f"append to parameter_data_combined[{key}]:")
-                if key in parameter_data_combined.keys():
-                    print(parameter_data_combined[key])
+                print(list(parameter_data_combined.keys()))
+                print("\n")
                 if key not in parameter_data_combined.keys():
                     parameter_data_combined[key] = pd.DataFrame({})
                 parameter_data_combined[key][step] = data[0]
