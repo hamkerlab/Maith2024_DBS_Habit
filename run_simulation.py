@@ -171,9 +171,6 @@ def run_sim(parameter, step, dbs_param_state):
     # run_script_parallel was adjusted (save everything separately) and now needs to
     # be combined after all simulations
 
-    simulation_data_combined = {}
-    parameter_data_combined = {}
-    mean_gpi_data_combined = {}
     # loop over all conducted simulations
     for args in args_list:
         (
@@ -526,6 +523,9 @@ if (
     and get_load_simulate_data == False
 ):
     parameter = str(0)
+    simulation_data_combined = {}
+    parameter_data_combined = {}
+    mean_gpi_data_combined = {}
     run_sim(parameter, 0, 0)
 if (
     get_dbs_parameter_data == False
@@ -544,6 +544,10 @@ if (
     and run_statistic == False
     and get_load_simulate_data == False
 ):
+
+    simulation_data_combined = {}
+    parameter_data_combined = {}
+    mean_gpi_data_combined = {}
     run_parameter()
 if (
     get_dbs_parameter_data == False
