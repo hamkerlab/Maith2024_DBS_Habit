@@ -434,10 +434,11 @@ def run_load_simulation():
     number_of_persons = 100
 
     for save_load_simulate_data, conditions in [[True, 1], [False, 5]]:
+        # create args_list
+        args_list = []
         for condition in range(conditions):
             for j in range(dbs_state):
                 for k in range(number_of_persons):
-
                     arg1 = str(k)
                     arg2 = str(j)
                     arg3 = str(short - 1)
@@ -445,9 +446,7 @@ def run_load_simulation():
                     arg5 = str(vis_weigths)
                     arg6 = str(save_load_simulate_data)
                     arg7 = str(condition + 1)
-                    command = [
-                        "python",
-                        "load_simulation.py",
+                    args = [
                         arg1,
                         arg2,
                         arg3,
@@ -456,7 +455,49 @@ def run_load_simulation():
                         arg6,
                         arg7,
                     ]
-                    subprocess.run(command)
+                    args_list.append(args)
+        run_script_parallel(
+            script_path="load_simulation.py", n_jobs=N_JOBS, args_list=args_list
+        )
+
+        # combine saved data which was created sequentially before and now in parallel
+        simulation_data_combined = {}
+        # loop over all conducted simulations
+        for args in args_list:
+            (
+                arg1,
+                arg2,
+                arg3,
+                arg4,
+                arg5,
+                arg6,
+                arg7,
+            ) = args
+
+            # define how the arguments are used in simulation.py
+            save_trials = arg6
+            column = arg1
+            dbs = arg2
+
+            # save_data was only called if save_trials was False
+            if save_trials == "False":
+                # load the file (name based on load_simulation.py) and add it to combined data
+                # as if the combined data would be created sequentially
+                filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{dbs}_Condition_{condition}_sim{column}.json"
+                # the key is the file which was created sequentially before
+                key = f"data/load_simulation_data/load_data/Results_DBS_State_{dbs}_Condition_{condition}.json"
+                data = pd.read_json(filepath, orient="records", lines=True)
+                if key not in simulation_data_combined.keys():
+                    simulation_data_combined[key] = pd.DataFrame({})
+                simulation_data_combined[key][column] = data[0]
+
+        # save simulation data combined
+        for key, val in simulation_data_combined.items():
+            val.to_json(
+                key,
+                orient="records",
+                lines=True,
+            )
 
 
 #####################################################################################################
