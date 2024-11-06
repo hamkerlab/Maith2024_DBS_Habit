@@ -430,20 +430,10 @@ def run_load_simulation():
     short = 2
     number_of_persons = 100
 
-    for i in range(2):
-        if i == 0:
-            save_load_simulate_data = True
-            conditions = 1
-        else:
-            save_load_simulate_data = False
-            conditions = 5
-
+    for save_load_simulate_data, conditions in [[True, 1], [False, 5]]:
         for condition in range(conditions):
             for j in range(dbs_state):
                 for k in range(number_of_persons):
-
-                    if save_load_simulate_data == False and conditions == 1:
-                        continue
 
                     arg1 = str(k)
                     arg2 = str(j)
