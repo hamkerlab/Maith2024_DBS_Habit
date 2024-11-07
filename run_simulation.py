@@ -432,9 +432,9 @@ def run_load_simulation():
                         arg7,
                     ]
                     args_list.append(args)
-        # run_script_parallel(
-        #     script_path="load_simulation.py", n_jobs=N_JOBS, args_list=args_list
-        # )
+        run_script_parallel(
+            script_path="load_simulation.py", n_jobs=N_JOBS, args_list=args_list
+        )
 
         # combine saved data which was created sequentially before and now in parallel
         # loop over all conducted simulations
@@ -468,7 +468,6 @@ def run_load_simulation():
                 load_simulation_data_combined[key][column] = data[0]
 
     # save simulation data combined
-    print(load_simulation_data_combined.keys())
     for key, val in load_simulation_data_combined.items():
         val.to_json(
             key,
