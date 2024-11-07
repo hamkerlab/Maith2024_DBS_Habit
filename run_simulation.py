@@ -406,11 +406,11 @@ def run_load_simulation():
     short = 2
     number_of_persons = 100
 
+    load_simulation_data_combined = {}
     for save_load_simulate_data, conditions in [
         [True, 1],
         [False, 5],
-    ]:  # TODO schaue auf cuneus ob results korrekt aussehen, dann starte komplet parallelized
-        # create args_list
+    ]:
         args_list = []
         for condition in range(conditions):
             for j in range(dbs_state):
@@ -432,12 +432,11 @@ def run_load_simulation():
                         arg7,
                     ]
                     args_list.append(args)
-        run_script_parallel(
-            script_path="load_simulation.py", n_jobs=N_JOBS, args_list=args_list
-        )
+        # run_script_parallel(
+        #     script_path="load_simulation.py", n_jobs=N_JOBS, args_list=args_list
+        # )
 
         # combine saved data which was created sequentially before and now in parallel
-        simulation_data_combined = {}
         # loop over all conducted simulations
         for args in args_list:
             (
@@ -463,17 +462,17 @@ def run_load_simulation():
                 # the key is the file which was created sequentially before
                 key = f"data/load_simulation_data/load_data/Results_DBS_State_{dbs}_Condition_{condition}.json"
                 data = pd.read_json(filepath, orient="records", lines=True)
-                if key not in simulation_data_combined.keys():
-                    simulation_data_combined[key] = pd.DataFrame({})
-                simulation_data_combined[key][column] = data[0]
+                if key not in load_simulation_data_combined.keys():
+                    load_simulation_data_combined[key] = pd.DataFrame({})
+                load_simulation_data_combined[key][column] = data[0]
 
-        # save simulation data combined
-        for key, val in simulation_data_combined.items():
-            val.to_json(
-                key,
-                orient="records",
-                lines=True,
-            )
+    # save simulation data combined
+    for key, val in load_simulation_data_combined.items():
+        val.to_json(
+            key,
+            orient="records",
+            lines=True,
+        )
 
 
 #####################################################################################################
