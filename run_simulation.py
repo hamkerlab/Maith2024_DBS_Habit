@@ -467,6 +467,7 @@ def run_load_simulation():
                 load_simulation_data_combined[key][column] = data[0]
 
     # save simulation data combined
+    print(load_simulation_data_combined.keys())
     for key, val in load_simulation_data_combined.items():
         val.to_json(
             key,
