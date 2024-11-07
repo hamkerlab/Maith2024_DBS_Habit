@@ -451,8 +451,9 @@ def run_load_simulation():
 
             # define how the arguments are used in simulation.py
             save_trials = arg6
-            column = arg1
-            dbs = arg2
+            column = int(arg1)
+            dbs = int(arg2)
+            condition = int(arg7)
 
             # save_data was only called if save_trials was False
             if save_trials == "False":
