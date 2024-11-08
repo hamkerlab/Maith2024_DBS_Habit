@@ -18,15 +18,20 @@ import pymc as pm
 import arviz as az
 import matplotlib.pyplot as plt
 import os
+import pandas as pd
+import pickle
+from scipy.special import logsumexp
+from scipy.optimize import minimize
+import seaborn as sns
 
 
-def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.6):
+def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
     """
     This function generates data from a simple Q-learning model. It simulates a
     two-armed bandit task with actions 0 and 1, and reward probabilities P(R(a=1)) = p
-    and P(R(a=0)) = 1-p. The Q-learning model uses softmax action selection and
-    two learning rates, alpha_plus and alpha_minus, for positive and negative
-    prediction errors, respectively.
+    and P(R(a=0)) = 1-p. After half of the trials the propapilities reverse.The
+    Q-learning model uses softmax action selection and two learning rates, alpha_plus
+    and alpha_minus, for positive and negative prediction errors, respectively.
 
     Args:
         rng (numpy.random.Generator):
@@ -40,7 +45,7 @@ def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.6):
         n (int):
             Number of trials.
         p (float):
-            Probability of reward for the second action.
+            Probability of reward for the second action (action==1).
 
     Returns:
         actions (numpy.ndarray):
@@ -60,8 +65,11 @@ def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.6):
     Q = np.array([0.5, 0.5])
     # loop over trials
     for i in range(n):
+        # reverse the reward propapilities
+        if i == n // 2:
+            prob_r.reverse()
         # compute action probabilities using softmax
-        exp_Q = np.exp(beta * (Q - np.max(Q)))
+        exp_Q = np.exp(beta * Q)
         prob_a = exp_Q / np.sum(exp_Q)
         # action selection and reward
         a = rng.choice([0, 1], p=prob_a)
@@ -468,6 +476,7 @@ def analyze_model(
     tune,
     draws,
     draws_prior,
+    target_accept,
 ):
     # plot model
     pm.model_to_graphviz(model).render(f"{save_folder}/{name}_model_plot")
@@ -492,7 +501,15 @@ def analyze_model(
     # sample the posterior
     with model:
         # sample from the posterior
-        idata.extend(pm.sample(random_seed=rng, chains=chains, tune=tune, draws=draws))
+        idata.extend(
+            pm.sample(
+                random_seed=rng,
+                chains=chains,
+                tune=tune,
+                draws=draws,
+                target_accept=target_accept,
+            )
+        )
         # compute the log likelihood of the model
         pm.compute_log_likelihood(idata)
 
@@ -520,19 +537,26 @@ def analyze_model(
         plt.close("all")
 
     # plot the forest plot
-    az.plot_forest(
-        idata,
-        var_names=(
-            ["alpha", "beta"]
-            if "alpha" in idata.posterior.data_vars
-            else ["alpha_plus", "alpha_minus", "beta"]
-        ),
-        r_hat=True,
-        combined=True,
-        figsize=(6, 18),
-    )
-    plt.savefig(f"{save_folder}/{name}_forest_plot.png")
-    plt.close("all")
+    if (
+        ("alpha" in idata.posterior.data_vars) and ("beta" in idata.posterior.data_vars)
+    ) or (
+        ("alpha_plus" in idata.posterior.data_vars)
+        and ("alpha_minus" in idata.posterior.data_vars)
+        and ("beta" in idata.posterior.data_vars)
+    ):
+        az.plot_forest(
+            idata,
+            var_names=(
+                ["alpha", "beta"]
+                if "alpha" in idata.posterior.data_vars
+                else ["alpha_plus", "alpha_minus", "beta"]
+            ),
+            r_hat=True,
+            combined=True,
+            figsize=(6, 18),
+        )
+        plt.savefig(f"{save_folder}/{name}_forest_plot.png")
+        plt.close("all")
 
     # print the summary of the model
     az.summary(idata).to_csv(f"{save_folder}/{name}_summary.csv")
@@ -543,43 +567,307 @@ def analyze_model(
     return idata
 
 
+def load_data_previously_selected(
+    subject_type: str,
+    shortcut_type: str,
+    dbs_state: str,
+    dbs_variant: str,
+):
+    """
+    For all subjects load the choices and the obtained rewards for all trials.
+
+    Args:
+        subject_type (str):
+            "patient" or "simulation"
+        shortcut_type (str):
+            "plastic" or "fixed"
+        dbs_state (str):
+            "ON" or "OFF"
+        dbs_variant (str):
+            "off", "suppression", "efferent", "afferent", "passing", or "dbs-all"
+
+    Returns:
+        pd.DataFrame:
+            DataFrame containing the subject, trial, choice and reward columns
+    """
+    # data needs to be loaded differently for patients/simulations
+    if subject_type == "patient":
+        file_name = "data/patient_data/choices_rewards_per_trial.pkl"
+        # load data using pickle
+        with open(file_name, "rb") as f:
+            data_patients = pickle.load(f)
+        # get the correct format for the data
+        ret = {}
+        ret["subject"] = []
+        ret["trial"] = []
+        ret["choice"] = []
+        ret["reward"] = []
+        for subject in data_patients:
+            for trial, choice in enumerate(
+                data_patients[subject][dbs_state]["choices"]
+            ):
+                ret["subject"].append(subject)
+                ret["trial"].append(trial)
+                ret["choice"].append(choice)
+            for reward in data_patients[subject][dbs_state]["rewards"]:
+                ret["reward"].append(reward)
+
+    elif subject_type == "simulation":
+        shortcut_load = {"plastic": 1, "fixed": 0}[shortcut_type]
+        if dbs_state == "OFF":
+            dbs_load = 0
+        elif dbs_state == "ON":
+            dbs_load = {
+                "off": 0,
+                "suppression": 1,
+                "efferent": 2,
+                "afferent": 3,
+                "passing": 4,
+                "dbs-all": 5,
+            }[dbs_variant]
+        file_name = (
+            lambda sim_id: f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut_load}_DBS_State{dbs_load}_sim{sim_id}.pkl"
+        )
+        # load data using pickle
+        # get the correct format for the data
+        ret = {}
+        ret["subject"] = []
+        ret["trial"] = []
+        ret["choice"] = []
+        ret["reward"] = []
+        for sim_id in range(100):
+            with open(file_name(sim_id), "rb") as f:
+                data_patients = pickle.load(f)
+                for trial, choice in enumerate(data_patients["choices"]):
+                    ret["subject"].append(sim_id)
+                    ret["trial"].append(trial)
+                    # choice+1 to obtain choices 1 and 2 as for patients
+                    ret["choice"].append(choice + 1)
+                for reward in data_patients["rewards"]:
+                    ret["reward"].append(reward)
+
+    return pd.DataFrame(ret)
+
+
+def transform_range(vector: np.ndarray, new_min, new_max):
+    return ((vector - vector.min()) / (vector.max() - vector.min())) * (
+        new_max - new_min
+    ) + new_min
+
+
+def llik_td(x, *args):
+    # Extract the arguments as they are passed by scipy.optimize.minimize
+    alpha, beta = x
+    actions, rewards = args
+
+    # Initialize values
+    Qs = np.zeros((len(actions), 2))
+    Q = np.array([0.5, 0.5])
+    logp_actions = np.zeros(len(actions))
+
+    for t, (a, r) in enumerate(zip(actions, rewards)):
+        Qs[t] = Q
+        # Apply the softmax transformation
+        Q_ = Q * beta
+        logp_action = Q_ - logsumexp(Q_)
+
+        # Store the log probability of the observed action
+        logp_actions[t] = logp_action[a]
+
+        # Update the Q values for the next trial
+        Q[a] = Q[a] + alpha * (r - Q[a])
+
+    # Return the negative log likelihood of all observed actions
+    return -np.sum(logp_actions[1:]), Qs
+
+
+def mean_without_outlier(data: np.ndarray):
+    # Calculate Q1 and Q3 (25th and 75th percentiles)
+    q1, q3 = np.percentile(data, [25, 75])
+    iqr = q3 - q1  # Interquartile range
+
+    # Set bounds to exclude outliers
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+
+    # Filter data to remove outliers
+    filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]
+    mean_without_outliers = np.mean(filtered_data)
+    std_without_outliers = np.std(filtered_data)
+
+    return mean_without_outliers, std_without_outliers
+
+
+def get_mle_estimates(data_on, data_off, plot_patients, rng, plot_mle_estimates):
+    alpha_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
+    beta_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
+
+    for dbs, data in enumerate([data_off, data_on]):
+        for subject_idx, subject in enumerate(data["subject"].unique()):
+            actions = data[data["subject"] == subject]["choice"].values
+            rewards = data[data["subject"] == subject]["reward"].values
+
+            result = minimize(
+                lambda x, *args: llik_td(x, *args)[0],
+                [0.3, 1.0],
+                args=(
+                    transform_range(actions, new_min=0, new_max=1).astype(int),
+                    rewards,
+                ),
+                method="BFGS",
+            )
+            alpha, beta = result.x
+            alpha_patients_arr[subject_idx, dbs] = alpha
+            beta_patients_arr[subject_idx, dbs] = beta
+            if plot_patients:
+                qs = llik_td(
+                    result.x,
+                    *(
+                        transform_range(actions, new_min=0, new_max=1).astype(int),
+                        rewards,
+                    ),
+                )[1]
+                fake_actions, fake_rewards, fake_qs = generate_data_q_learn(
+                    rng,
+                    alpha,
+                    alpha,
+                    beta,
+                    len(actions),
+                )
+                # plot the qs and which action selected and rewards
+                actions = transform_range(actions, new_min=-1, new_max=1).astype(int)
+                fake_actions = transform_range(
+                    fake_actions, new_min=-1, new_max=1
+                ).astype(int)
+                plt.figure(figsize=(6.4 * 2, 4.8 * 3))
+                plt.subplot(321)
+                plt.title(f"DBS {['OFF', 'ON'][dbs]} Subject {subject}")
+                plt.bar(
+                    range(len(actions)),
+                    actions * (actions > 0).astype(int),
+                    width=1.0,
+                    color="b",
+                )
+                plt.bar(
+                    range(len(actions)),
+                    actions * (actions < 0).astype(int),
+                    width=1.0,
+                    color="r",
+                )
+                plt.subplot(323)
+                plt.bar(range(len(actions)), rewards, width=1.0)
+                plt.subplot(325)
+                plt.title(f"alpha {round(alpha, 3)}, beta {round(beta, 3)}")
+                plt.plot(range(len(actions)), qs[:, 0], color="r")
+                plt.plot(range(len(actions)), qs[:, 1], color="b")
+                plt.ylim(0.5 - np.abs(qs - 0.5).max(), 0.5 + np.abs(qs - 0.5).max())
+
+                plt.subplot(322)
+                plt.title("fake data")
+                plt.bar(
+                    range(len(actions)),
+                    fake_actions * (fake_actions > 0).astype(int),
+                    width=1.0,
+                    color="b",
+                )
+                plt.bar(
+                    range(len(actions)),
+                    fake_actions * (fake_actions < 0).astype(int),
+                    width=1.0,
+                    color="r",
+                )
+                plt.subplot(324)
+                plt.bar(range(len(actions)), fake_rewards, width=1.0)
+                plt.subplot(326)
+                plt.title(f"alpha {round(alpha, 3)}, beta {round(beta, 3)}")
+                plt.plot(range(len(actions)), fake_qs[:, 0], color="r")
+                plt.plot(range(len(actions)), fake_qs[:, 1], color="b")
+                plt.ylim(
+                    0.5 - np.abs(fake_qs - 0.5).max(), 0.5 + np.abs(fake_qs - 0.5).max()
+                )
+                plt.tight_layout()
+                plt.show()
+    if plot_mle_estimates:
+        # plot MLE alphas and betas of patients
+
+        # Combine the data into a single list for boxplot
+        combined_data = [
+            alpha_patients_arr[:, 0],
+            alpha_patients_arr[:, 1],
+            beta_patients_arr[:, 0],
+            beta_patients_arr[:, 1],
+        ]
+
+        # Create a list of labels for each boxplot
+        labels = [
+            "Alpha - DBS OFF",
+            "Alpha - DBS ON",
+            "Beta - DBS OFF",
+            "Beta - DBS ON",
+        ]
+
+        # Create the boxplot
+        plt.figure(figsize=(8, 6))
+        sns.boxplot(data=combined_data)
+
+        # Set x-axis labels
+        plt.ylim(0, 15)
+        plt.xticks(ticks=np.arange(4), labels=labels, rotation=45)
+        plt.ylabel("Value")
+        plt.title("Boxplot Comparison Between Two Conditions")
+        plt.show()
+
+    # get mean and std estimates for alpha and beta for the two groups of subjects
+    alpha_mle_estimates = mean_without_outlier(alpha_patients_arr.flatten())
+    beta_mle_estimates = mean_without_outlier(beta_patients_arr.flatten())
+
+    return alpha_mle_estimates, beta_mle_estimates
+
+
 if __name__ == "__main__":
     save_folder = "results_fitting_q_learning"
     seed = 123
-    tune = 7000
-    draws = 15000
+    tune = 500  # 7000
+    draws = 1000  # 15000
     draws_prior = 2000
+    target_accept = 0.9
+    plot_patients = True
+    plot_mle_estimates = False
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
     az.style.use("arviz-darkgrid")
     rng = np.random.default_rng(seed)
 
-    # generate data using the true parameters
-    n_subjects = 14
-    true_alpha = np.clip(rng.normal(loc=0.3, scale=0.05, size=n_subjects), 0.01, 1.0)
-    true_alpha_plus = true_alpha
-    true_alpha_minus = np.clip(true_alpha + 0.15, 0.01, 1.0)
-    true_alpha_plus_2d = np.stack([true_alpha_plus, true_alpha_plus], axis=1)
-    true_alpha_minus_2d = np.stack([true_alpha_minus, true_alpha_minus], axis=1)
+    # loading patient data # TODO different subject numbers... only use which made bith, dbs on and off
+    data_off = load_data_previously_selected(
+        subject_type="patient",
+        shortcut_type=None,
+        dbs_state="OFF",
+        dbs_variant=None,
+    )
+    data_on = load_data_previously_selected(
+        subject_type="patient",
+        shortcut_type=None,
+        dbs_state="ON",
+        dbs_variant=None,
+    )
 
-    actions_arr = np.empty((2, n_subjects), dtype=object)
-    rewards_arr = np.empty((2, n_subjects), dtype=object)
-    observed_list = []
-    true_beta_arr = np.clip(rng.normal(loc=1.5, scale=0.25, size=n_subjects), 0.5, 3.0)
-    true_beta_2d = np.stack([true_beta_arr, true_beta_arr / 2], axis=1)
+    # get mle estimates of alpha and beta for the patient data, patient data already
+    # only contains patients which did both dbs on and off
+    alpha_estimates, beta_estimates = get_mle_estimates(
+        data_on, data_off, plot_patients, rng, plot_mle_estimates
+    )
+    quit()
 
-    # print true alpha and beta in text file
-    with open(f"{save_folder}/true_alpha_beta.txt", "w") as f:
-        f.write(f"True alpha plus:\n{true_alpha_plus_2d}\n\n")
-        f.write(f"True alpha minus:\n{true_alpha_minus_2d}\n\n")
-        f.write(f"True beta:\n{true_beta_2d}\n")
+    # get actions, rewards, observed data arrays
+    # TODO continue here, use actions rewards from patients then create priors using the mle estiamtes
 
     for dbs in [0, 1]:
         for subject in range(n_subjects):
 
             n = 100 + rng.integers(-20, 20)
 
-            actions, rewards, _ = generate_data_q_learn(
+            actions, rewards, qs = generate_data_q_learn(
                 rng,
                 true_alpha_plus_2d[subject, dbs],
                 true_alpha_minus_2d[subject, dbs],
@@ -590,6 +878,19 @@ if __name__ == "__main__":
             actions_arr[dbs, subject] = actions
             rewards_arr[dbs, subject] = rewards
             observed_list.append(actions[1:])
+
+            # plot the qs and which action selected and rewards
+            plt.figure()
+            plt.subplot(311)
+            plt.bar(range(n), actions, width=1.0)
+            plt.subplot(312)
+            plt.bar(range(n), rewards, width=1.0)
+            plt.subplot(313)
+            plt.bar(range(n), qs[:, 0], width=1.0, alpha=0.5)
+            plt.bar(range(n), qs[:, 1], width=1.0, alpha=0.5)
+            plt.tight_layout()
+            plt.show()
+    quit()
 
     observed_arr = np.concatenate(observed_list)
 
@@ -604,22 +905,20 @@ if __name__ == "__main__":
         observed_data = pm.Data("observed_data", observed_arr)
 
         # Group-level mean and standard deviation for learning rate
-        alpha_mean_global = pm.TruncatedNormal(
+        alpha_mean_global = pm.Uniform(
             "alpha_mean_global",
-            mu=0.3,
-            sigma=0.1,
             lower=0.1,
-            upper=0.6,
+            upper=0.7,
         )
-        alpha_sig_global = pm.Exponential("alpha_sig_global", lam=60)
+        alpha_sig_global = pm.Exponential("alpha_sig_global", lam=10)
 
-        # Group-level mean and standard deviation for the change of learning rate by dbs
-        alpha_dbs_effect_mean_global = pm.Normal(
-            "alpha_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        )
-        alpha_dbs_effect_sig_global = pm.Exponential(
-            "alpha_dbs_effect_sig_global", lam=50
-        )
+        # # Group-level mean and standard deviation for the change of learning rate by dbs
+        # alpha_dbs_effect_mean_global = pm.Normal(
+        #     "alpha_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        # )
+        # alpha_dbs_effect_sig_global = pm.Exponential(
+        #     "alpha_dbs_effect_sig_global", lam=10
+        # )
 
         # subject-level learning rate
         alpha_subject = pm.TruncatedNormal(
@@ -631,102 +930,112 @@ if __name__ == "__main__":
             dims="subjects",
         )
 
-        # subject-level change of learning rate by dbs
-        alpha_subject_dbs_effect = pm.TruncatedNormal(
-            "alpha_subject_dbs_effect",
-            mu=alpha_dbs_effect_mean_global,
-            sigma=alpha_dbs_effect_sig_global,
-            lower=-1,
-            upper=1,
-            dims="subjects",
-        )
+        # # subject-level change of learning rate by dbs
+        # alpha_subject_dbs_effect = pm.TruncatedNormal(
+        #     "alpha_subject_dbs_effect",
+        #     mu=alpha_dbs_effect_mean_global,
+        #     sigma=alpha_dbs_effect_sig_global,
+        #     lower=-1,
+        #     upper=1,
+        #     dims="subjects",
+        # )
 
-        # Calculate learning rate for each subject in each dbs condition
+        # # Calculate learning rate for each subject in each dbs condition
+        # alpha = pm.Deterministic(
+        #     "alpha",
+        #     pt.clip(
+        #         alpha_subject.dimshuffle(0, "x")
+        #         * (
+        #             1
+        #             + alpha_subject_dbs_effect.dimshuffle(0, "x")
+        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+        #         ),
+        #         0.01,
+        #         1.0,
+        #     ),
+        #     dims=("subjects", "dbs"),
+        # )
         alpha = pm.Deterministic(
             "alpha",
-            pt.clip(
-                alpha_subject.dimshuffle(0, "x")
-                * (
-                    1
-                    + alpha_subject_dbs_effect.dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                ),
-                0.01,
-                1.0,
+            pt.tile(
+                alpha_subject.reshape((len(coords["subjects"]), 1)),
+                (1, len(coords["dbs"])),
             ),
             dims=("subjects", "dbs"),
         )
 
-        # Group-level mean and standard deviation for inverse temperature
-        beta_mean_global = my_Gamma(
-            "beta_mean_global",
-            mu=2.5,
-            sigma=1.0,
-        )
-        beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
+        # # Group-level mean and standard deviation for inverse temperature
+        # beta_mean_global = my_Gamma(
+        #     "beta_mean_global",
+        #     mu=2.5,
+        #     sigma=1.0,
+        # )
+        # beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # Group-level mean and standard deviation for the change of inverse temperature
-        # by dbs
-        beta_dbs_effect_mean_global = pm.Normal(
-            "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        )
-        beta_dbs_effect_sig_global = pm.Exponential(
-            "beta_dbs_effect_sig_global", lam=50
-        )
+        # # Group-level mean and standard deviation for the change of inverse temperature
+        # # by dbs
+        # beta_dbs_effect_mean_global = pm.Normal(
+        #     "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        # )
+        # beta_dbs_effect_sig_global = pm.Exponential(
+        #     "beta_dbs_effect_sig_global", lam=50
+        # )
 
-        # subject-level inverse temperature
-        beta_subject = my_Gamma(
-            "beta_subject",
-            mu=beta_mean_global,
-            sigma=beta_sig_global,
-            dims="subjects",
-        )
+        # # subject-level inverse temperature
+        # beta_subject = my_Gamma(
+        #     "beta_subject",
+        #     mu=beta_mean_global,
+        #     sigma=beta_sig_global,
+        #     dims="subjects",
+        # )
 
-        # subject-level change of inverse temperature by dbs
-        beta_subject_dbs_effect = pm.TruncatedNormal(
-            "beta_subject_dbs_effect",
-            mu=beta_dbs_effect_mean_global,
-            sigma=beta_dbs_effect_sig_global,
-            lower=-1,
-            upper=1,
-            dims="subjects",
-        )
+        # # subject-level change of inverse temperature by dbs
+        # beta_subject_dbs_effect = pm.TruncatedNormal(
+        #     "beta_subject_dbs_effect",
+        #     mu=beta_dbs_effect_mean_global,
+        #     sigma=beta_dbs_effect_sig_global,
+        #     lower=-1,
+        #     upper=1,
+        #     dims="subjects",
+        # )
 
-        # Calculate inverse temperature for each subject in each dbs condition
-        beta = pm.Deterministic(
-            "beta",
-            pt.clip(
-                beta_subject.dimshuffle(0, "x")
-                * (
-                    1
-                    + beta_subject_dbs_effect.dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                ),
-                0.01,
-                1000.0,
-            ),
-            dims=("subjects", "dbs"),
-        )
+        # # Calculate inverse temperature for each subject in each dbs condition
+        # beta = pm.Deterministic(
+        #     "beta",
+        #     pt.clip(
+        #         beta_subject.dimshuffle(0, "x")
+        #         * (
+        #             1
+        #             + beta_subject_dbs_effect.dimshuffle(0, "x")
+        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+        #         ),
+        #         0.01,
+        #         1000.0,
+        #     ),
+        #     dims=("subjects", "dbs"),
+        # )
 
-        # compute the probability of selecting action 1 after each trial based on parameters
-        action_is_one_probs = pm.Deterministic(
-            "action_is_one_probs",
-            get_probabilities_single(
-                coords,
-                alpha,
-                beta,
-                actions_arr,
-                rewards_arr,
-            ),
-        )
+        # # compute the probability of selecting action 1 after each trial based on parameters
+        # action_is_one_probs = pm.Deterministic(
+        #     "action_is_one_probs",
+        #     get_probabilities_single(
+        #         coords,
+        #         alpha,
+        #         true_beta_2d,
+        #         actions_arr,
+        #         rewards_arr,
+        #     ),
+        # )
 
-        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
-        # likelihood with the computed probabilities
-        pm.Bernoulli(
-            name="like",
-            p=action_is_one_probs,
-            observed=observed_data,
-        )
+        # # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+        # # likelihood with the computed probabilities
+        # pm.Bernoulli(
+        #     name="like",
+        #     p=action_is_one_probs,
+        #     observed=observed_data,
+        # )
+
+        pm.Normal(name="like", mu=alpha, sigma=0.01, observed=true_alpha_plus_2d)
 
     idata_single = analyze_model(
         name="single",
@@ -740,30 +1049,29 @@ if __name__ == "__main__":
         tune=tune,
         draws=draws,
         draws_prior=draws_prior,
+        target_accept=target_accept,
     )
-
+    quit()
     # model with two learning rates
     with pm.Model(coords=coords) as m_bernoulli_double:
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
         # Group-level mean and standard deviation for learning rate
-        alpha_plus_mean_global = pm.TruncatedNormal(
+        alpha_plus_mean_global = pm.Uniform(
             "alpha_plus_mean_global",
-            mu=0.3,
-            sigma=0.1,
             lower=0.1,
-            upper=0.6,
+            upper=0.7,
         )
-        alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=60)
+        alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=10)
 
-        # Group-level mean and standard deviation for the change of learning rate by dbs
-        alpha_plus_dbs_effect_mean_global = pm.Normal(
-            "alpha_plus_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        )
-        alpha_plus_dbs_effect_sig_global = pm.Exponential(
-            "alpha_plus_dbs_effect_sig_global", lam=50
-        )
+        # # Group-level mean and standard deviation for the change of learning rate by dbs
+        # alpha_plus_dbs_effect_mean_global = pm.Normal(
+        #     "alpha_plus_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        # )
+        # alpha_plus_dbs_effect_sig_global = pm.Exponential(
+        #     "alpha_plus_dbs_effect_sig_global", lam=10
+        # )
 
         # subject-level learning rate
         alpha_plus_subject = pm.TruncatedNormal(
@@ -775,49 +1083,55 @@ if __name__ == "__main__":
             dims="subjects",
         )
 
-        # subject-level change of learning rate by dbs
-        alpha_plus_subject_dbs_effect = pm.TruncatedNormal(
-            "alpha_plus_subject_dbs_effect",
-            mu=alpha_plus_dbs_effect_mean_global,
-            sigma=alpha_plus_dbs_effect_sig_global,
-            lower=-1,
-            upper=1,
-            dims="subjects",
-        )
+        # # subject-level change of learning rate by dbs
+        # alpha_plus_subject_dbs_effect = pm.TruncatedNormal(
+        #     "alpha_plus_subject_dbs_effect",
+        #     mu=alpha_plus_dbs_effect_mean_global,
+        #     sigma=alpha_plus_dbs_effect_sig_global,
+        #     lower=-1,
+        #     upper=1,
+        #     dims="subjects",
+        # )
 
-        # Calculate learning rate for each subject in each dbs condition
+        # # Calculate learning rate for each subject in each dbs condition
+        # alpha_plus = pm.Deterministic(
+        #     "alpha_plus",
+        #     pt.clip(
+        #         alpha_plus_subject.dimshuffle(0, "x")
+        #         * (
+        #             1
+        #             + alpha_plus_subject_dbs_effect.dimshuffle(0, "x")
+        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+        #         ),
+        #         0.01,
+        #         1.0,
+        #     ),
+        #     dims=("subjects", "dbs"),
+        # )
         alpha_plus = pm.Deterministic(
             "alpha_plus",
-            pt.clip(
-                alpha_plus_subject.dimshuffle(0, "x")
-                * (
-                    1
-                    + alpha_plus_subject_dbs_effect.dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                ),
-                0.01,
-                1.0,
+            pt.tile(
+                alpha_plus_subject.reshape((len(coords["subjects"]), 1)),
+                (1, len(coords["dbs"])),
             ),
             dims=("subjects", "dbs"),
         )
 
         # Group-level mean and standard deviation for learning rate
-        alpha_minus_mean_global = pm.TruncatedNormal(
+        alpha_minus_mean_global = pm.Uniform(
             "alpha_minus_mean_global",
-            mu=0.3,
-            sigma=0.1,
             lower=0.1,
-            upper=0.6,
+            upper=0.7,
         )
-        alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=60)
+        alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=10)
 
-        # Group-level mean and standard deviation for the change of learning rate by dbs
-        alpha_minus_dbs_effect_mean_global = pm.Normal(
-            "alpha_minus_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        )
-        alpha_minus_dbs_effect_sig_global = pm.Exponential(
-            "alpha_minus_dbs_effect_sig_global", lam=50
-        )
+        # # Group-level mean and standard deviation for the change of learning rate by dbs
+        # alpha_minus_dbs_effect_mean_global = pm.Normal(
+        #     "alpha_minus_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        # )
+        # alpha_minus_dbs_effect_sig_global = pm.Exponential(
+        #     "alpha_minus_dbs_effect_sig_global", lam=10
+        # )
 
         # subject-level learning rate
         alpha_minus_subject = pm.TruncatedNormal(
@@ -829,82 +1143,90 @@ if __name__ == "__main__":
             dims="subjects",
         )
 
-        # subject-level change of learning rate by dbs
-        alpha_minus_subject_dbs_effect = pm.TruncatedNormal(
-            "alpha_minus_subject_dbs_effect",
-            mu=alpha_minus_dbs_effect_mean_global,
-            sigma=alpha_minus_dbs_effect_sig_global,
-            lower=-1,
-            upper=1,
-            dims="subjects",
-        )
+        # # subject-level change of learning rate by dbs
+        # alpha_minus_subject_dbs_effect = pm.TruncatedNormal(
+        #     "alpha_minus_subject_dbs_effect",
+        #     mu=alpha_minus_dbs_effect_mean_global,
+        #     sigma=alpha_minus_dbs_effect_sig_global,
+        #     lower=-1,
+        #     upper=1,
+        #     dims="subjects",
+        # )
 
-        # Calculate learning rate for each subject in each dbs condition
+        # # Calculate learning rate for each subject in each dbs condition
+        # alpha_minus = pm.Deterministic(
+        #     "alpha_minus",
+        #     pt.clip(
+        #         alpha_minus_subject.dimshuffle(0, "x")
+        #         * (
+        #             1
+        #             + alpha_minus_subject_dbs_effect.dimshuffle(0, "x")
+        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+        #         ),
+        #         0.01,
+        #         1.0,
+        #     ),
+        #     dims=("subjects", "dbs"),
+        # )
         alpha_minus = pm.Deterministic(
             "alpha_minus",
-            pt.clip(
-                alpha_minus_subject.dimshuffle(0, "x")
-                * (
-                    1
-                    + alpha_minus_subject_dbs_effect.dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                ),
-                0.01,
-                1.0,
+            pt.tile(
+                alpha_minus_subject.reshape((len(coords["subjects"]), 1)),
+                (1, len(coords["dbs"])),
             ),
             dims=("subjects", "dbs"),
         )
 
-        # Group-level mean and standard deviation for inverse temperature
-        beta_mean_global = my_Gamma(
-            "beta_mean_global",
-            mu=2.5,
-            sigma=1.0,
-        )
-        beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
+        # # Group-level mean and standard deviation for inverse temperature
+        # beta_mean_global = my_Gamma(
+        #     "beta_mean_global",
+        #     mu=2.5,
+        #     sigma=1.0,
+        # )
+        # beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
 
-        # Group-level mean and standard deviation for the change of inverse temperature
-        # by dbs
-        beta_dbs_effect_mean_global = pm.Normal(
-            "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        )
-        beta_dbs_effect_sig_global = pm.Exponential(
-            "beta_dbs_effect_sig_global", lam=50
-        )
+        # # Group-level mean and standard deviation for the change of inverse temperature
+        # # by dbs
+        # beta_dbs_effect_mean_global = pm.Normal(
+        #     "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
+        # )
+        # beta_dbs_effect_sig_global = pm.Exponential(
+        #     "beta_dbs_effect_sig_global", lam=50
+        # )
 
-        # subject-level inverse temperature
-        beta_subject = my_Gamma(
-            "beta_subject",
-            mu=beta_mean_global,
-            sigma=beta_sig_global,
-            dims="subjects",
-        )
+        # # subject-level inverse temperature
+        # beta_subject = my_Gamma(
+        #     "beta_subject",
+        #     mu=beta_mean_global,
+        #     sigma=beta_sig_global,
+        #     dims="subjects",
+        # )
 
-        # subject-level change of inverse temperature by dbs
-        beta_subject_dbs_effect = pm.TruncatedNormal(
-            "beta_subject_dbs_effect",
-            mu=beta_dbs_effect_mean_global,
-            sigma=beta_dbs_effect_sig_global,
-            lower=-1,
-            upper=1,
-            dims="subjects",
-        )
+        # # subject-level change of inverse temperature by dbs
+        # beta_subject_dbs_effect = pm.TruncatedNormal(
+        #     "beta_subject_dbs_effect",
+        #     mu=beta_dbs_effect_mean_global,
+        #     sigma=beta_dbs_effect_sig_global,
+        #     lower=-1,
+        #     upper=1,
+        #     dims="subjects",
+        # )
 
-        # Calculate inverse temperature for each subject in each dbs condition
-        beta = pm.Deterministic(
-            "beta",
-            pt.clip(
-                beta_subject.dimshuffle(0, "x")
-                * (
-                    1
-                    + beta_subject_dbs_effect.dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                ),
-                0.01,
-                1000.0,
-            ),
-            dims=("subjects", "dbs"),
-        )
+        # # Calculate inverse temperature for each subject in each dbs condition
+        # beta = pm.Deterministic(
+        #     "beta",
+        #     pt.clip(
+        #         beta_subject.dimshuffle(0, "x")
+        #         * (
+        #             1
+        #             + beta_subject_dbs_effect.dimshuffle(0, "x")
+        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+        #         ),
+        #         0.01,
+        #         1000.0,
+        #     ),
+        #     dims=("subjects", "dbs"),
+        # )
 
         # compute the probability of selecting action 1 after each trial based on parameters
         action_is_one_probs = pm.Deterministic(
@@ -913,7 +1235,7 @@ if __name__ == "__main__":
                 coords,
                 alpha_plus,
                 alpha_minus,
-                beta,
+                true_beta_2d,
                 actions_arr,
                 rewards_arr,
             ),
@@ -939,6 +1261,7 @@ if __name__ == "__main__":
         tune=tune,
         draws=draws,
         draws_prior=draws_prior,
+        target_accept=target_accept,
     )
 
     # model comparison using LOO (Leave-One-Out cross-validation)
