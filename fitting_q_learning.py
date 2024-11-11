@@ -69,7 +69,7 @@ def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
         if i == n // 2:
             prob_r.reverse()
         # compute action probabilities using softmax
-        exp_Q = np.exp(beta * Q)
+        exp_Q = np.exp(beta * (Q - np.max(Q)))
         prob_a = exp_Q / np.sum(exp_Q)
         # action selection and reward
         a = rng.choice([0, 1], p=prob_a)
@@ -146,6 +146,9 @@ def get_action_is_one_probs_single(alpha, beta, actions, rewards):
         outputs_info=[Qs],
         non_sequences=[alpha],
     )
+
+    # remove max for numerical stability
+    Qs = Qs - pt.max(Qs, axis=1, keepdims=True)
 
     # Compute the log probabilities for each trial of the actions
     # Qs[-1] are the Q-values after the last trial which are not needed
@@ -298,6 +301,9 @@ def get_action_is_one_probs_double(alpha_plus, alpha_minus, beta, actions, rewar
         outputs_info=[Qs],
         non_sequences=[alpha_plus, alpha_minus],
     )
+
+    # remove max for numerical stability
+    Qs = Qs - pt.max(Qs, axis=1, keepdims=True)
 
     # Compute the log probabilities for each trial of the actions
     # Qs[-1] are the Q-values after the last trial which are not needed
@@ -469,9 +475,6 @@ def analyze_model(
     model,
     save_folder,
     rng,
-    true_alpha_plus_2d,
-    true_alpha_minus_2d,
-    true_beta_2d,
     chains,
     tune,
     draws,
@@ -518,20 +521,9 @@ def analyze_model(
         # skip deterministic variables
         if var_name == "action_is_one_probs":
             continue
-        if var_name == "alpha":
-            ref_val = true_alpha_plus_2d.flatten().tolist()
-        elif var_name == "alpha_plus":
-            ref_val = true_alpha_plus_2d.flatten().tolist()
-        elif var_name == "alpha_minus":
-            ref_val = true_alpha_minus_2d.flatten().tolist()
-        elif var_name == "beta":
-            ref_val = true_beta_2d.flatten().tolist()
-        else:
-            ref_val = None
         az.plot_posterior(
             data=idata,
             var_names=[var_name],
-            ref_val=ref_val,
         )
         plt.savefig(f"{save_folder}/{name}_posterior_{var_name}.png")
         plt.close("all")
@@ -611,6 +603,12 @@ def load_data_previously_selected(
                 ret["choice"].append(choice)
             for reward in data_patients[subject][dbs_state]["rewards"]:
                 ret["reward"].append(reward)
+        # choices should be 0 and 1
+        ret["choice"] = (
+            transform_range(np.array(ret["choice"]), new_min=0, new_max=1)
+            .astype(int)
+            .tolist()
+        )
 
     elif subject_type == "simulation":
         shortcut_load = {"plastic": 1, "fixed": 0}[shortcut_type]
@@ -698,7 +696,9 @@ def mean_without_outlier(data: np.ndarray):
     return mean_without_outliers, std_without_outliers
 
 
-def get_mle_estimates(data_on, data_off, plot_patients, rng, plot_mle_estimates):
+def get_mle_estimates(
+    data_on, data_off, plot_patients, rng, plot_mle_estimates, save_folder
+):
     alpha_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
     beta_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
 
@@ -711,7 +711,7 @@ def get_mle_estimates(data_on, data_off, plot_patients, rng, plot_mle_estimates)
                 lambda x, *args: llik_td(x, *args)[0],
                 [0.3, 1.0],
                 args=(
-                    transform_range(actions, new_min=0, new_max=1).astype(int),
+                    actions,
                     rewards,
                 ),
                 method="BFGS",
@@ -723,7 +723,7 @@ def get_mle_estimates(data_on, data_off, plot_patients, rng, plot_mle_estimates)
                 qs = llik_td(
                     result.x,
                     *(
-                        transform_range(actions, new_min=0, new_max=1).astype(int),
+                        actions,
                         rewards,
                     ),
                 )[1]
@@ -786,7 +786,8 @@ def get_mle_estimates(data_on, data_off, plot_patients, rng, plot_mle_estimates)
                     0.5 - np.abs(fake_qs - 0.5).max(), 0.5 + np.abs(fake_qs - 0.5).max()
                 )
                 plt.tight_layout()
-                plt.show()
+                plt.savefig(f"{save_folder}/data_patient_{subject}_dbs_{dbs}.png")
+                plt.close("all")
     if plot_mle_estimates:
         # plot MLE alphas and betas of patients
 
@@ -815,16 +816,119 @@ def get_mle_estimates(data_on, data_off, plot_patients, rng, plot_mle_estimates)
         plt.xticks(ticks=np.arange(4), labels=labels, rotation=45)
         plt.ylabel("Value")
         plt.title("Boxplot Comparison Between Two Conditions")
-        plt.show()
+        plt.tight_layout()
+        plt.savefig(f"{save_folder}/data_mle_estimates_boxplot.png")
+        plt.close("all")
 
     # get mean and std estimates for alpha and beta for the two groups of subjects
     alpha_mle_estimates = mean_without_outlier(alpha_patients_arr.flatten())
     beta_mle_estimates = mean_without_outlier(beta_patients_arr.flatten())
 
+    # write mle estimates of alpha and beta to a file and their estimates in logit and
+    # log space
+    alpha_m_logit, alpha_s_logit = prior_in_logit(
+        alpha_mle_estimates[0], alpha_mle_estimates[1]
+    )
+    beta_m_log, beta_s_log = prior_in_log(beta_mle_estimates[0], beta_mle_estimates[1])
+    with open(f"{save_folder}/mle_estimates.txt", "w") as f:
+        f.write(f"alpha: {alpha_mle_estimates[0]} +/- {alpha_mle_estimates[1]}\n")
+        f.write(f"alpha: {alpha_m_logit} +/- {alpha_s_logit} in logit space\n")
+        f.write(f"beta: {beta_mle_estimates[0]} +/- {beta_mle_estimates[1]}\n")
+        f.write(f"beta: {beta_m_log} +/- {beta_s_log} in log space\n")
+
     return alpha_mle_estimates, beta_mle_estimates
 
 
+def prior_in_logit(mu, sigma):
+    """
+    Transform a prior (mean and standard deviation) from the "probability space" x=(0,1)
+    to the logit space x=(-inf,inf) y=(0,1).
+
+    !!! warning
+    Works worse if mu - sigma > 0 and mu + sigma < 1.
+
+    Args:
+        mu (float):
+            Mean of the prior in the probability space (between 0 and 1).
+        sigma (float):
+            Standard deviation of the prior in the probability space.
+
+    Returns:
+        mu_logit (float):
+            Mean of the prior in the logit space.
+        sigma_logit (float):
+            Standard deviation of the prior in the logit space.
+    """
+    mu_logit = np.log(mu / (1 - mu))
+    lower = np.clip((mu - sigma), 0.0001, 0.9999)
+    upper = np.clip((mu + sigma), 0.0001, 0.9999)
+    sigma_interval_lower = np.log(lower / (1 - lower))
+    sigma_interval_upper = np.log(upper / (1 - upper))
+    sigma_logit = (sigma_interval_upper - sigma_interval_lower) / 2
+
+    return mu_logit, sigma_logit
+
+
+def prior_in_log(mu, sigma):
+    """
+    Transform a prior (mean and standard deviation) from the "rate space" x=(0,inf)
+    to the log space x=(-inf,inf) y=(0,inf).
+
+
+    Args:
+        mu (float):
+            Mean of the prior in the probability space (>0).
+        sigma (float):
+            Standard deviation of the prior in the probability space.
+
+    Returns:
+        mu_log (float):
+            Mean of the prior in the log space.
+        sigma_log (float):
+            Standard deviation of the prior in the log space.
+    """
+    mu_log = np.log(mu**2 / np.sqrt(mu**2 + sigma**2))
+    sigma_log = np.sqrt(np.log(1 + sigma**2 / mu**2))
+
+    return mu_log, sigma_log
+
+
 if __name__ == "__main__":
+
+    # from scipy import stats
+    # from scipy.special import expit
+
+    # mu = 7
+    # sigma = 7
+    # mu_logit, sigma_logit = prior_in_log(mu, sigma)
+    # plt.figure()
+    # # plot original distribution
+    # plt.subplot(311)
+    # x = np.linspace(0, 15, 1000)
+    # plt.plot(x, stats.norm.pdf(x, loc=mu, scale=sigma))
+    # plt.xlim(0, 15)
+    # plt.xlabel("x")
+    # plt.ylabel("Density")
+    # plt.title("Original distribution")
+    # # plot logit distribution
+    # plt.subplot(312)
+    # x_logit = np.linspace(-5, 5, 100)
+    # plt.plot(x_logit, stats.norm.pdf(x_logit, loc=mu_logit, scale=sigma_logit))
+    # plt.xlabel("x")
+    # plt.ylabel("Density")
+    # plt.title("Log distribution")
+    # # plot inverse logit distribution
+    # plt.subplot(313)
+    # plt.plot(np.exp(x_logit), stats.norm.pdf(x_logit, loc=mu_logit, scale=sigma_logit))
+    # plt.xlim(0, 15)
+    # plt.xlabel("x")
+    # plt.ylabel("Density")
+    # plt.title("Inverse log distribution")
+    # plt.tight_layout()
+    # plt.show()
+
+    # quit()
+
     save_folder = "results_fitting_q_learning"
     seed = 123
     tune = 500  # 7000
@@ -832,13 +936,13 @@ if __name__ == "__main__":
     draws_prior = 2000
     target_accept = 0.9
     plot_patients = True
-    plot_mle_estimates = False
+    plot_mle_estimates = True
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
     az.style.use("arviz-darkgrid")
     rng = np.random.default_rng(seed)
 
-    # loading patient data # TODO different subject numbers... only use which made bith, dbs on and off
+    # loading patient data
     data_off = load_data_previously_selected(
         subject_type="patient",
         shortcut_type=None,
@@ -851,68 +955,64 @@ if __name__ == "__main__":
         dbs_state="ON",
         dbs_variant=None,
     )
+    n_subjects = len(data_off["subject"].unique())
+    n_subjects = 2  # TODO remove this line
 
     # get mle estimates of alpha and beta for the patient data, patient data already
     # only contains patients which did both dbs on and off
     alpha_estimates, beta_estimates = get_mle_estimates(
-        data_on, data_off, plot_patients, rng, plot_mle_estimates
+        data_on=data_on,
+        data_off=data_off,
+        plot_patients=plot_patients,
+        rng=rng,
+        plot_mle_estimates=plot_mle_estimates,
+        save_folder=save_folder,
     )
-    quit()
 
     # get actions, rewards, observed data arrays
     # TODO continue here, use actions rewards from patients then create priors using the mle estiamtes
+    actions_arr = np.empty((2, n_subjects), dtype=object)
+    rewards_arr = np.empty((2, n_subjects), dtype=object)
+    observed_list = []
 
     for dbs in [0, 1]:
-        for subject in range(n_subjects):
-
-            n = 100 + rng.integers(-20, 20)
-
-            actions, rewards, qs = generate_data_q_learn(
-                rng,
-                true_alpha_plus_2d[subject, dbs],
-                true_alpha_minus_2d[subject, dbs],
-                true_beta_2d[subject, dbs],
-                n,
-            )
-
-            actions_arr[dbs, subject] = actions
-            rewards_arr[dbs, subject] = rewards
+        data = data_off if dbs == 0 else data_off  # TODO change this to data_on
+        for subject_idx, subject in enumerate(
+            data_off["subject"].unique()[:2]
+        ):  # TODO loop over all subjects
+            actions = data[data["subject"] == subject]["choice"].values
+            actions_arr[dbs, subject_idx] = actions
+            rewards_arr[dbs, subject_idx] = data[data["subject"] == subject][
+                "reward"
+            ].values
             observed_list.append(actions[1:])
-
-            # plot the qs and which action selected and rewards
-            plt.figure()
-            plt.subplot(311)
-            plt.bar(range(n), actions, width=1.0)
-            plt.subplot(312)
-            plt.bar(range(n), rewards, width=1.0)
-            plt.subplot(313)
-            plt.bar(range(n), qs[:, 0], width=1.0, alpha=0.5)
-            plt.bar(range(n), qs[:, 1], width=1.0, alpha=0.5)
-            plt.tight_layout()
-            plt.show()
-    quit()
 
     observed_arr = np.concatenate(observed_list)
 
     coords = {
-        "dbs": range(actions_arr.shape[0]),
-        "subjects": range(actions_arr.shape[1]),
+        "dbs": range(2),
+        "subjects": range(n_subjects),
     }
+
+    # logit scale for alpha and log scale for beta seems to work quite well
+    # next TODO:
+    # - again include dbs effects in the model, make them additive in the logit / log space
+    # - update the model with two learning rates
+    # - run large simulations with all subjects
 
     # model with single learning rate
     with pm.Model(coords=coords) as m_bernoulli_single:
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # Group-level mean and standard deviation for learning rate
-        alpha_mean_global = pm.Uniform(
-            "alpha_mean_global",
-            lower=0.1,
-            upper=0.7,
+        # Group-level mean and standard deviation for learning rate on the logit scale
+        mu_logit_alpha, sigma_logit_alpha = prior_in_logit(
+            alpha_estimates[0], alpha_estimates[1]
         )
-        alpha_sig_global = pm.Exponential("alpha_sig_global", lam=10)
+        alpha_mean_global = pm.Normal("alpha_mean_global", mu_logit_alpha, 0.2)
+        alpha_sig_global = pm.Exponential("alpha_sig_global", 1.0 / sigma_logit_alpha)
 
-        # # Group-level mean and standard deviation for the change of learning rate by dbs
+        # # Group-level mean and standard deviation for the change of learning rate by dbs # TODO make the dbs effects additive again
         # alpha_dbs_effect_mean_global = pm.Normal(
         #     "alpha_dbs_effect_mean_global", mu=0.0, sigma=0.2
         # )
@@ -921,12 +1021,11 @@ if __name__ == "__main__":
         # )
 
         # subject-level learning rate
-        alpha_subject = pm.TruncatedNormal(
+        # Non-centered parameterization + transform from logit to "probability space"
+        alpha_z_subject = pm.Normal("alpha_z_subject", 0, 1, dims="subjects")
+        alpha_subject = pm.Deterministic(
             "alpha_subject",
-            mu=alpha_mean_global,
-            sigma=alpha_sig_global,
-            lower=0,
-            upper=1,
+            pm.math.sigmoid(alpha_mean_global + alpha_z_subject * alpha_sig_global),
             dims="subjects",
         )
 
@@ -955,6 +1054,7 @@ if __name__ == "__main__":
         #     ),
         #     dims=("subjects", "dbs"),
         # )
+        # just duplicate the alpha for each dbs condition
         alpha = pm.Deterministic(
             "alpha",
             pt.tile(
@@ -964,13 +1064,10 @@ if __name__ == "__main__":
             dims=("subjects", "dbs"),
         )
 
-        # # Group-level mean and standard deviation for inverse temperature
-        # beta_mean_global = my_Gamma(
-        #     "beta_mean_global",
-        #     mu=2.5,
-        #     sigma=1.0,
-        # )
-        # beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
+        # Group-level mean and standard deviation for inverse temperature on the log scale
+        mu_log_beta, sigma_log_beta = prior_in_log(beta_estimates[0], beta_estimates[1])
+        beta_mean_global = pm.Normal("beta_mean_global", mu_log_beta, 2.0)
+        beta_sig_global = pm.Exponential("beta_sig_global", 1.0 / sigma_log_beta)
 
         # # Group-level mean and standard deviation for the change of inverse temperature
         # # by dbs
@@ -981,13 +1078,14 @@ if __name__ == "__main__":
         #     "beta_dbs_effect_sig_global", lam=50
         # )
 
-        # # subject-level inverse temperature
-        # beta_subject = my_Gamma(
-        #     "beta_subject",
-        #     mu=beta_mean_global,
-        #     sigma=beta_sig_global,
-        #     dims="subjects",
-        # )
+        # subject-level inverse temperature
+        # Non-centered parameterization + transform from log to "rate space"
+        beta_z_subject = pm.Normal("beta_z_subject", 0, 1, dims="subjects")
+        beta_subject = pm.Deterministic(
+            "beta_subject",
+            pm.math.exp(beta_mean_global + beta_z_subject * beta_sig_global),
+            dims="subjects",
+        )
 
         # # subject-level change of inverse temperature by dbs
         # beta_subject_dbs_effect = pm.TruncatedNormal(
@@ -1014,37 +1112,41 @@ if __name__ == "__main__":
         #     ),
         #     dims=("subjects", "dbs"),
         # )
+        # just duplicate the beta for each dbs condition
+        beta = pm.Deterministic(
+            "beta",
+            pt.tile(
+                beta_subject.reshape((len(coords["subjects"]), 1)),
+                (1, len(coords["dbs"])),
+            ),
+            dims=("subjects", "dbs"),
+        )
 
-        # # compute the probability of selecting action 1 after each trial based on parameters
-        # action_is_one_probs = pm.Deterministic(
-        #     "action_is_one_probs",
-        #     get_probabilities_single(
-        #         coords,
-        #         alpha,
-        #         true_beta_2d,
-        #         actions_arr,
-        #         rewards_arr,
-        #     ),
-        # )
+        # compute the probability of selecting action 1 after each trial based on parameters
+        action_is_one_probs = pm.Deterministic(
+            "action_is_one_probs",
+            get_probabilities_single(
+                coords,
+                alpha,
+                beta,
+                actions_arr,
+                rewards_arr,
+            ),
+        )
 
-        # # observed data (actions are either 0 or 1) can be modeled as Bernoulli
-        # # likelihood with the computed probabilities
-        # pm.Bernoulli(
-        #     name="like",
-        #     p=action_is_one_probs,
-        #     observed=observed_data,
-        # )
-
-        pm.Normal(name="like", mu=alpha, sigma=0.01, observed=true_alpha_plus_2d)
+        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+        # likelihood with the computed probabilities
+        pm.Bernoulli(
+            name="like",
+            p=action_is_one_probs,
+            observed=observed_data,
+        )
 
     idata_single = analyze_model(
         name="single",
         model=m_bernoulli_single,
         save_folder=save_folder,
         rng=rng,
-        true_alpha_plus_2d=true_alpha_plus_2d,
-        true_alpha_minus_2d=true_alpha_minus_2d,
-        true_beta_2d=true_beta_2d,
         chains=4,
         tune=tune,
         draws=draws,
