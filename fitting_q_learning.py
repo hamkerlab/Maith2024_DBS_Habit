@@ -1063,10 +1063,8 @@ if __name__ == "__main__":
     seed = 123
     tune = 7000
     draws = 15000
-    tune = 500  # TODO remove this line
-    draws = 1000  # TODO remove this line
     draws_prior = 2000
-    target_accept = 0.95
+    target_accept = 0.975
     plot_patients = True
     plot_mle_estimates = True
     if not os.path.exists(save_folder):
@@ -1088,7 +1086,6 @@ if __name__ == "__main__":
         dbs_variant=None,
     )
     n_subjects = len(data_off["subject"].unique())
-    n_subjects = 2  # TODO remove this line
 
     # get mle estimates of alpha and beta for the patient data, patient data already
     # only contains patients which did both dbs on and off
@@ -1124,12 +1121,6 @@ if __name__ == "__main__":
         "dbs": range(2),
         "subjects": range(n_subjects),
     }
-
-    # logit scale for alpha and log scale for beta seems to work quite well
-    # next TODO:
-    # - again include dbs effects in the model, make them additive in the logit / log space
-    # - update the model with two learning rates
-    # - run large simulations with all subjects
 
     # model with single learning rate
     with pm.Model(coords=coords) as m_bernoulli_single:
