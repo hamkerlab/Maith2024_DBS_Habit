@@ -893,48 +893,180 @@ def prior_in_log(mu, sigma):
     return mu_log, sigma_log
 
 
+def load_inferred_params_and_create_data():
+
+    # load the inference data object
+    save_folder = "results_fitting_q_learning_with_dbs_effects"
+    idata = az.from_netcdf(f"{save_folder}/single_idata.nc")
+
+    # get the traces for parameters `alpha` and `beta`
+    alpha = idata.posterior["alpha"].values
+    beta = idata.posterior["beta"].values
+
+    # combine chains
+    alpha = alpha.reshape((np.prod(alpha.shape[:2]),) + alpha.shape[2:])
+    beta = beta.reshape((np.prod(beta.shape[:2]),) + beta.shape[2:])
+
+    alpha = alpha[:3]
+    beta = beta[:3]
+
+    rng = np.random.default_rng(12345)
+
+    for idx, alpha_beta in enumerate(zip(alpha, beta)):
+        alpha, beta = alpha_beta
+        for subject in range(2):
+            for dbs in range(2):
+                fake_actions, fake_rewards, fake_qs = generate_data_q_learn(
+                    rng,
+                    alpha[subject, dbs],
+                    alpha[subject, dbs],
+                    beta[subject, dbs],
+                    120,
+                )
+                # plot the qs and which action selected and rewards
+                fake_actions = transform_range(
+                    fake_actions, new_min=-1, new_max=1
+                ).astype(int)
+                plt.figure(figsize=(6.4 * 2, 4.8 * 3))
+                plt.subplot(321)
+                plt.subplot(323)
+                plt.subplot(325)
+
+                plt.subplot(322)
+                plt.title("fake data")
+                plt.bar(
+                    range(120),
+                    fake_actions * (fake_actions > 0).astype(int),
+                    width=1.0,
+                    color="b",
+                )
+                plt.bar(
+                    range(120),
+                    fake_actions * (fake_actions < 0).astype(int),
+                    width=1.0,
+                    color="r",
+                )
+                plt.subplot(324)
+                plt.bar(range(120), fake_rewards, width=1.0)
+                plt.subplot(326)
+                plt.title(
+                    f"alpha {round(alpha[subject, dbs], 3)}, beta {round(beta[subject, dbs], 3)}"
+                )
+                plt.plot(range(120), fake_qs[:, 0], color="r")
+                plt.plot(range(120), fake_qs[:, 1], color="b")
+                plt.ylim(
+                    0.5 - np.abs(fake_qs - 0.5).max(), 0.5 + np.abs(fake_qs - 0.5).max()
+                )
+                plt.tight_layout()
+                plt.savefig(
+                    f"{save_folder}/data_patient_{subject}_dbs_{dbs}_fake{idx}.png"
+                )
+                plt.close("all")
+
+
+def create_param(
+    param_name: str,
+    coords: dict,
+    estimates: tuple,
+    std_of_mean: float,
+    dbs_effect: tuple,
+    transform: str,
+):
+    """
+    Create a parameter in the model with a hierarchical structure. The parameter priors
+    are defined in a transformed space (group level mean, standard deviation of the
+    group level mean, standard deviation of the group of subjects). The parameter is
+    transformed to the original space using a given transformation.
+
+    Args:
+        param_name (str):
+            Name of the parameter.
+        coords (dict):
+            Dictionary containing the coordinates of the model.
+        estimates (tuple):
+            Tuple containing the group mean and standard deviation of the group of
+            subjects (in the original space).
+        std_of_mean (float):
+            Standard deviation of the group-level mean (in the transformed space).
+        dbs_effect (tuple):
+            Tuple containing the mean and standard deviation of the change of the
+            parameter by dbs (in the transformed space).
+        transform (str):
+            Transformation to apply to the parameter from the transformed space to
+            obtain the parameter in the original space. Either "sigmoid" (for parameter
+            between 0 and 1) or "exp" (for parameter > 0).
+
+    Returns:
+        pm.Deterministic:
+            Deterministic variable representing the parameter in the original space.
+    """
+    # Group-level mean and standard deviation for parameter in the transformed space
+    if transform == "sigmoid":
+        mu_transformed, sigma_transformed = prior_in_logit(estimates[0], estimates[1])
+    elif transform == "exp":
+        mu_transformed, sigma_transformed = prior_in_log(estimates[0], estimates[1])
+    mean_global = pm.Normal(f"{param_name}_mean_global", mu_transformed, std_of_mean)
+    sig_global = pm.Exponential(f"{param_name}_sig_global", 1.0 / sigma_transformed)
+    # subject-level parameter non-centered parameterization
+    z_subject = pm.Normal(f"{param_name}_z_subject", 0, 1, dims="subjects")
+
+    # Group-level mean and standard deviation for the change of parameter by dbs in the
+    # transformed space
+    dbs_effect_mean_global = pm.Normal(
+        f"{param_name}_dbs_effect_mean_global", mu=0.0, sigma=dbs_effect[0]
+    )
+    dbs_effect_sig_global = pm.Exponential(
+        f"{param_name}_dbs_effect_sig_global", lam=1.0 / dbs_effect[1]
+    )
+    # subject-level change of parameter by dbs non-centered parameterization
+    z_subject_dbs_effect = pm.Normal(
+        f"{param_name}_z_subject_dbs_effect", 0, 1, dims="subjects"
+    )
+
+    # Calculate parameter for each subject in each dbs condition in the transformed space
+    # and then transform to the original space
+    if transform == "sigmoid":
+        return pm.Deterministic(
+            param_name,
+            pm.math.sigmoid(
+                (mean_global + z_subject * sig_global).dimshuffle(0, "x")
+                + (
+                    (
+                        dbs_effect_mean_global
+                        + z_subject_dbs_effect * dbs_effect_sig_global
+                    ).dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                )
+            ),
+            dims=("subjects", "dbs"),
+        )
+    elif transform == "exp":
+        return pm.Deterministic(
+            param_name,
+            pm.math.exp(
+                (mean_global + z_subject * sig_global).dimshuffle(0, "x")
+                + (
+                    (
+                        dbs_effect_mean_global
+                        + z_subject_dbs_effect * dbs_effect_sig_global
+                    ).dimshuffle(0, "x")
+                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+                )
+            ),
+            dims=("subjects", "dbs"),
+        )
+
+
 if __name__ == "__main__":
 
-    # from scipy import stats
-    # from scipy.special import expit
-
-    # mu = 7
-    # sigma = 7
-    # mu_logit, sigma_logit = prior_in_log(mu, sigma)
-    # plt.figure()
-    # # plot original distribution
-    # plt.subplot(311)
-    # x = np.linspace(0, 15, 1000)
-    # plt.plot(x, stats.norm.pdf(x, loc=mu, scale=sigma))
-    # plt.xlim(0, 15)
-    # plt.xlabel("x")
-    # plt.ylabel("Density")
-    # plt.title("Original distribution")
-    # # plot logit distribution
-    # plt.subplot(312)
-    # x_logit = np.linspace(-5, 5, 100)
-    # plt.plot(x_logit, stats.norm.pdf(x_logit, loc=mu_logit, scale=sigma_logit))
-    # plt.xlabel("x")
-    # plt.ylabel("Density")
-    # plt.title("Log distribution")
-    # # plot inverse logit distribution
-    # plt.subplot(313)
-    # plt.plot(np.exp(x_logit), stats.norm.pdf(x_logit, loc=mu_logit, scale=sigma_logit))
-    # plt.xlim(0, 15)
-    # plt.xlabel("x")
-    # plt.ylabel("Density")
-    # plt.title("Inverse log distribution")
-    # plt.tight_layout()
-    # plt.show()
-
-    # quit()
-
-    save_folder = "results_fitting_q_learning"
+    save_folder = "results_fitting_q_learning_complete"
     seed = 123
-    tune = 500  # 7000
-    draws = 1000  # 15000
+    tune = 7000
+    draws = 15000
+    tune = 500  # TODO remove this line
+    draws = 1000  # TODO remove this line
     draws_prior = 2000
-    target_accept = 0.9
+    target_accept = 0.95
     plot_patients = True
     plot_mle_estimates = True
     if not os.path.exists(save_folder):
@@ -970,16 +1102,15 @@ if __name__ == "__main__":
     )
 
     # get actions, rewards, observed data arrays
-    # TODO continue here, use actions rewards from patients then create priors using the mle estiamtes
     actions_arr = np.empty((2, n_subjects), dtype=object)
     rewards_arr = np.empty((2, n_subjects), dtype=object)
     observed_list = []
 
     for dbs in [0, 1]:
-        data = data_off if dbs == 0 else data_off  # TODO change this to data_on
-        for subject_idx, subject in enumerate(
-            data_off["subject"].unique()[:2]
-        ):  # TODO loop over all subjects
+        data = data_off if dbs == 0 else data_on
+        for subject_idx, subject in enumerate(data_off["subject"].unique()):
+            if subject_idx >= n_subjects:
+                break
             actions = data[data["subject"] == subject]["choice"].values
             actions_arr[dbs, subject_idx] = actions
             rewards_arr[dbs, subject_idx] = data[data["subject"] == subject][
@@ -1005,124 +1136,26 @@ if __name__ == "__main__":
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # Group-level mean and standard deviation for learning rate on the logit scale
-        mu_logit_alpha, sigma_logit_alpha = prior_in_logit(
-            alpha_estimates[0], alpha_estimates[1]
-        )
-        alpha_mean_global = pm.Normal("alpha_mean_global", mu_logit_alpha, 0.2)
-        alpha_sig_global = pm.Exponential("alpha_sig_global", 1.0 / sigma_logit_alpha)
-
-        # # Group-level mean and standard deviation for the change of learning rate by dbs # TODO make the dbs effects additive again
-        # alpha_dbs_effect_mean_global = pm.Normal(
-        #     "alpha_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        # )
-        # alpha_dbs_effect_sig_global = pm.Exponential(
-        #     "alpha_dbs_effect_sig_global", lam=10
-        # )
-
-        # subject-level learning rate
-        # Non-centered parameterization + transform from logit to "probability space"
-        alpha_z_subject = pm.Normal("alpha_z_subject", 0, 1, dims="subjects")
-        alpha_subject = pm.Deterministic(
-            "alpha_subject",
-            pm.math.sigmoid(alpha_mean_global + alpha_z_subject * alpha_sig_global),
-            dims="subjects",
+        alpha = create_param(
+            param_name="alpha",
+            coords=coords,
+            estimates=alpha_estimates,
+            std_of_mean=0.2,
+            dbs_effect=(0.1, 0.2),
+            transform="sigmoid",
         )
 
-        # # subject-level change of learning rate by dbs
-        # alpha_subject_dbs_effect = pm.TruncatedNormal(
-        #     "alpha_subject_dbs_effect",
-        #     mu=alpha_dbs_effect_mean_global,
-        #     sigma=alpha_dbs_effect_sig_global,
-        #     lower=-1,
-        #     upper=1,
-        #     dims="subjects",
-        # )
-
-        # # Calculate learning rate for each subject in each dbs condition
-        # alpha = pm.Deterministic(
-        #     "alpha",
-        #     pt.clip(
-        #         alpha_subject.dimshuffle(0, "x")
-        #         * (
-        #             1
-        #             + alpha_subject_dbs_effect.dimshuffle(0, "x")
-        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-        #         ),
-        #         0.01,
-        #         1.0,
-        #     ),
-        #     dims=("subjects", "dbs"),
-        # )
-        # just duplicate the alpha for each dbs condition
-        alpha = pm.Deterministic(
-            "alpha",
-            pt.tile(
-                alpha_subject.reshape((len(coords["subjects"]), 1)),
-                (1, len(coords["dbs"])),
-            ),
-            dims=("subjects", "dbs"),
+        beta = create_param(
+            param_name="beta",
+            coords=coords,
+            estimates=beta_estimates,
+            std_of_mean=2.0,
+            dbs_effect=(3.0, 3.0),
+            transform="exp",
         )
 
-        # Group-level mean and standard deviation for inverse temperature on the log scale
-        mu_log_beta, sigma_log_beta = prior_in_log(beta_estimates[0], beta_estimates[1])
-        beta_mean_global = pm.Normal("beta_mean_global", mu_log_beta, 2.0)
-        beta_sig_global = pm.Exponential("beta_sig_global", 1.0 / sigma_log_beta)
-
-        # # Group-level mean and standard deviation for the change of inverse temperature
-        # # by dbs
-        # beta_dbs_effect_mean_global = pm.Normal(
-        #     "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        # )
-        # beta_dbs_effect_sig_global = pm.Exponential(
-        #     "beta_dbs_effect_sig_global", lam=50
-        # )
-
-        # subject-level inverse temperature
-        # Non-centered parameterization + transform from log to "rate space"
-        beta_z_subject = pm.Normal("beta_z_subject", 0, 1, dims="subjects")
-        beta_subject = pm.Deterministic(
-            "beta_subject",
-            pm.math.exp(beta_mean_global + beta_z_subject * beta_sig_global),
-            dims="subjects",
-        )
-
-        # # subject-level change of inverse temperature by dbs
-        # beta_subject_dbs_effect = pm.TruncatedNormal(
-        #     "beta_subject_dbs_effect",
-        #     mu=beta_dbs_effect_mean_global,
-        #     sigma=beta_dbs_effect_sig_global,
-        #     lower=-1,
-        #     upper=1,
-        #     dims="subjects",
-        # )
-
-        # # Calculate inverse temperature for each subject in each dbs condition
-        # beta = pm.Deterministic(
-        #     "beta",
-        #     pt.clip(
-        #         beta_subject.dimshuffle(0, "x")
-        #         * (
-        #             1
-        #             + beta_subject_dbs_effect.dimshuffle(0, "x")
-        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-        #         ),
-        #         0.01,
-        #         1000.0,
-        #     ),
-        #     dims=("subjects", "dbs"),
-        # )
-        # just duplicate the beta for each dbs condition
-        beta = pm.Deterministic(
-            "beta",
-            pt.tile(
-                beta_subject.reshape((len(coords["subjects"]), 1)),
-                (1, len(coords["dbs"])),
-            ),
-            dims=("subjects", "dbs"),
-        )
-
-        # compute the probability of selecting action 1 after each trial based on parameters
+        # compute the probability of selecting action 1 after each trial, based on
+        # parameters
         action_is_one_probs = pm.Deterministic(
             "action_is_one_probs",
             get_probabilities_single(
@@ -1153,191 +1186,48 @@ if __name__ == "__main__":
         draws_prior=draws_prior,
         target_accept=target_accept,
     )
-    quit()
+
     # model with two learning rates
     with pm.Model(coords=coords) as m_bernoulli_double:
         # observed data
         observed_data = pm.Data("observed_data", observed_arr)
 
-        # Group-level mean and standard deviation for learning rate
-        alpha_plus_mean_global = pm.Uniform(
-            "alpha_plus_mean_global",
-            lower=0.1,
-            upper=0.7,
-        )
-        alpha_plus_sig_global = pm.Exponential("alpha_plus_sig_global", lam=10)
-
-        # # Group-level mean and standard deviation for the change of learning rate by dbs
-        # alpha_plus_dbs_effect_mean_global = pm.Normal(
-        #     "alpha_plus_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        # )
-        # alpha_plus_dbs_effect_sig_global = pm.Exponential(
-        #     "alpha_plus_dbs_effect_sig_global", lam=10
-        # )
-
-        # subject-level learning rate
-        alpha_plus_subject = pm.TruncatedNormal(
-            "alpha_plus_subject",
-            mu=alpha_plus_mean_global,
-            sigma=alpha_plus_sig_global,
-            lower=0,
-            upper=1,
-            dims="subjects",
+        alpha_plus = create_param(
+            param_name="alpha_plus",
+            coords=coords,
+            estimates=alpha_estimates,
+            std_of_mean=0.2,
+            dbs_effect=(0.1, 0.2),
+            transform="sigmoid",
         )
 
-        # # subject-level change of learning rate by dbs
-        # alpha_plus_subject_dbs_effect = pm.TruncatedNormal(
-        #     "alpha_plus_subject_dbs_effect",
-        #     mu=alpha_plus_dbs_effect_mean_global,
-        #     sigma=alpha_plus_dbs_effect_sig_global,
-        #     lower=-1,
-        #     upper=1,
-        #     dims="subjects",
-        # )
-
-        # # Calculate learning rate for each subject in each dbs condition
-        # alpha_plus = pm.Deterministic(
-        #     "alpha_plus",
-        #     pt.clip(
-        #         alpha_plus_subject.dimshuffle(0, "x")
-        #         * (
-        #             1
-        #             + alpha_plus_subject_dbs_effect.dimshuffle(0, "x")
-        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-        #         ),
-        #         0.01,
-        #         1.0,
-        #     ),
-        #     dims=("subjects", "dbs"),
-        # )
-        alpha_plus = pm.Deterministic(
-            "alpha_plus",
-            pt.tile(
-                alpha_plus_subject.reshape((len(coords["subjects"]), 1)),
-                (1, len(coords["dbs"])),
-            ),
-            dims=("subjects", "dbs"),
+        alpha_minus = create_param(
+            param_name="alpha_minus",
+            coords=coords,
+            estimates=alpha_estimates,
+            std_of_mean=0.2,
+            dbs_effect=(0.1, 0.2),
+            transform="sigmoid",
         )
 
-        # Group-level mean and standard deviation for learning rate
-        alpha_minus_mean_global = pm.Uniform(
-            "alpha_minus_mean_global",
-            lower=0.1,
-            upper=0.7,
-        )
-        alpha_minus_sig_global = pm.Exponential("alpha_minus_sig_global", lam=10)
-
-        # # Group-level mean and standard deviation for the change of learning rate by dbs
-        # alpha_minus_dbs_effect_mean_global = pm.Normal(
-        #     "alpha_minus_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        # )
-        # alpha_minus_dbs_effect_sig_global = pm.Exponential(
-        #     "alpha_minus_dbs_effect_sig_global", lam=10
-        # )
-
-        # subject-level learning rate
-        alpha_minus_subject = pm.TruncatedNormal(
-            "alpha_minus_subject",
-            mu=alpha_minus_mean_global,
-            sigma=alpha_minus_sig_global,
-            lower=0,
-            upper=1,
-            dims="subjects",
+        beta = create_param(
+            param_name="beta",
+            coords=coords,
+            estimates=beta_estimates,
+            std_of_mean=2.0,
+            dbs_effect=(3.0, 3.0),
+            transform="exp",
         )
 
-        # # subject-level change of learning rate by dbs
-        # alpha_minus_subject_dbs_effect = pm.TruncatedNormal(
-        #     "alpha_minus_subject_dbs_effect",
-        #     mu=alpha_minus_dbs_effect_mean_global,
-        #     sigma=alpha_minus_dbs_effect_sig_global,
-        #     lower=-1,
-        #     upper=1,
-        #     dims="subjects",
-        # )
-
-        # # Calculate learning rate for each subject in each dbs condition
-        # alpha_minus = pm.Deterministic(
-        #     "alpha_minus",
-        #     pt.clip(
-        #         alpha_minus_subject.dimshuffle(0, "x")
-        #         * (
-        #             1
-        #             + alpha_minus_subject_dbs_effect.dimshuffle(0, "x")
-        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-        #         ),
-        #         0.01,
-        #         1.0,
-        #     ),
-        #     dims=("subjects", "dbs"),
-        # )
-        alpha_minus = pm.Deterministic(
-            "alpha_minus",
-            pt.tile(
-                alpha_minus_subject.reshape((len(coords["subjects"]), 1)),
-                (1, len(coords["dbs"])),
-            ),
-            dims=("subjects", "dbs"),
-        )
-
-        # # Group-level mean and standard deviation for inverse temperature
-        # beta_mean_global = my_Gamma(
-        #     "beta_mean_global",
-        #     mu=2.5,
-        #     sigma=1.0,
-        # )
-        # beta_sig_global = pm.Exponential("beta_sig_global", lam=5)
-
-        # # Group-level mean and standard deviation for the change of inverse temperature
-        # # by dbs
-        # beta_dbs_effect_mean_global = pm.Normal(
-        #     "beta_dbs_effect_mean_global", mu=0.0, sigma=0.2
-        # )
-        # beta_dbs_effect_sig_global = pm.Exponential(
-        #     "beta_dbs_effect_sig_global", lam=50
-        # )
-
-        # # subject-level inverse temperature
-        # beta_subject = my_Gamma(
-        #     "beta_subject",
-        #     mu=beta_mean_global,
-        #     sigma=beta_sig_global,
-        #     dims="subjects",
-        # )
-
-        # # subject-level change of inverse temperature by dbs
-        # beta_subject_dbs_effect = pm.TruncatedNormal(
-        #     "beta_subject_dbs_effect",
-        #     mu=beta_dbs_effect_mean_global,
-        #     sigma=beta_dbs_effect_sig_global,
-        #     lower=-1,
-        #     upper=1,
-        #     dims="subjects",
-        # )
-
-        # # Calculate inverse temperature for each subject in each dbs condition
-        # beta = pm.Deterministic(
-        #     "beta",
-        #     pt.clip(
-        #         beta_subject.dimshuffle(0, "x")
-        #         * (
-        #             1
-        #             + beta_subject_dbs_effect.dimshuffle(0, "x")
-        #             * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-        #         ),
-        #         0.01,
-        #         1000.0,
-        #     ),
-        #     dims=("subjects", "dbs"),
-        # )
-
-        # compute the probability of selecting action 1 after each trial based on parameters
+        # compute the probability of selecting action 1 after each trial based on
+        # parameters
         action_is_one_probs = pm.Deterministic(
             "action_is_one_probs",
             get_probabilities_double(
                 coords,
                 alpha_plus,
                 alpha_minus,
-                true_beta_2d,
+                beta,
                 actions_arr,
                 rewards_arr,
             ),
@@ -1356,9 +1246,6 @@ if __name__ == "__main__":
         model=m_bernoulli_double,
         save_folder=save_folder,
         rng=rng,
-        true_alpha_plus_2d=true_alpha_plus_2d,
-        true_alpha_minus_2d=true_alpha_minus_2d,
-        true_beta_2d=true_beta_2d,
         chains=4,
         tune=tune,
         draws=draws,
