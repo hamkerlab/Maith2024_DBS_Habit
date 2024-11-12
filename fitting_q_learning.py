@@ -1150,7 +1150,7 @@ if __name__ == "__main__":
             coords=coords,
             estimates=beta_estimates,
             std_of_mean=2.0,
-            dbs_effect=(3.0, 3.0),
+            dbs_effect=(3.0, 1.0),
             transform="exp",
         )
 
@@ -1215,7 +1215,7 @@ if __name__ == "__main__":
             coords=coords,
             estimates=beta_estimates,
             std_of_mean=2.0,
-            dbs_effect=(3.0, 3.0),
+            dbs_effect=(3.0, 1.0),
             transform="exp",
         )
 
