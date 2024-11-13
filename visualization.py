@@ -1648,14 +1648,59 @@ def parameter_gpi_inhib():
 #################################################################################################################
 
 
+def get_w_direct(loaded_variables, dbs_state, sim_id, trial):
+    w1 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "ITStrD1"
+        ][trial]
+    )
+    w2 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "StrD1GPi"
+        ][trial]
+    )
+    return np.transpose(np.matmul(w1, w2))
+
+
+def get_w_indirect(loaded_variables, dbs_state, sim_id, trial):
+    w1 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "ITStrD2"
+        ][trial]
+    )
+    w2 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "StrD2GPe"
+        ][trial]
+    )
+    return np.transpose(np.matmul(w1, w2))
+
+
+def get_w_hyperdirect(loaded_variables, dbs_state, sim_id, trial):
+    w1 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "ITSTN"
+        ][trial]
+    )
+    w2 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "STNGPi"
+        ][trial]
+    )
+    return np.transpose(np.matmul(w1, w2))
+
+
 def weights_over_time():
     # we have weights for each sim (0-99), shortcut (0-fixed,1-plastic), dbs state
     # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing,5-dbs-all)
 
     # data/simulation_data/plastic_weights_Shortcut0_DBS_State0_sim0.pkl
+    n_sims = 100
+    n_dbs = 6
+    n_trials = 120
     name_list = []
-    for sim_id in range(1):
-        for dbs_state in range(1):
+    for sim_id in range(n_sims):
+        for dbs_state in range(n_dbs):
             name_list.append(
                 f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
             )
@@ -1679,52 +1724,129 @@ def weights_over_time():
     # StrD2GPe
     # (120, 2, 4)
 
-    # TODOs:
+    # get the combined matrices for all time points / trials
+    w_direct = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_indirect = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_hyperdirect = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_shortcut = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_dopa_predict = np.zeros((n_sims, n_dbs, n_trials, 1, 4))
+
     # - matrix multiply
     #   - ITStrD1 * StrD1GPi --> w_direct
-    #   - ITStrD2 * StrD2GPe * _GPeGPi --> w_indirect # _GPeGPi is a constant from parameters
+    #   - ITStrD2 * StrD2GPe --> w_indirect
     #   - ITSTN * STNGPi --> w_hyperdirect
     # - sort others
     #   - ITThal --> w_shortcut
     #   - StrD1SNc --> w_dopa_predict
-    # - average other indizes/neurons:
+    for sim_id in range(n_sims):
+        for dbs_state in range(n_dbs):
+            for trial in range(n_trials):
+                w_direct[sim_id, dbs_state, trial] = get_w_direct(
+                    loaded_variables, dbs_state, sim_id, trial
+                )
+                w_indirect[sim_id, dbs_state, trial] = get_w_indirect(
+                    loaded_variables, dbs_state, sim_id, trial
+                )
+                w_hyperdirect[sim_id, dbs_state, trial] = get_w_hyperdirect(
+                    loaded_variables, dbs_state, sim_id, trial
+                )
+                w_shortcut[sim_id, dbs_state, trial] = loaded_variables[
+                    f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
+                ]["ITThal"][trial]
+
+                w_dopa_predict[sim_id, dbs_state, trial] = loaded_variables[
+                    f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
+                ]["StrD1SNc"][trial]
+
+    # - average over indizes/neurons:
     #   - w_direct, w_indirect, w_hyperdirect, w_shortcut --> over IT dimension
     #   - w_dopa_predict --> over StrD1 dimension
-    # - store all w_ variables with indizes (sim_id, dbs_state)
-    # - get information about the reversal (0->1 or 1->0)
-    # - average over sim_ids but only whose with the same reversal
+    w_direct = np.mean(w_direct, axis=4, keepdims=True)  # IT is pre
+    w_indirect = np.mean(w_indirect, axis=4, keepdims=True)  # IT is pre
+    w_hyperdirect = np.mean(w_hyperdirect, axis=4, keepdims=True)  # IT is pre
+    w_shortcut = np.mean(w_shortcut, axis=4, keepdims=True)  # IT is pre
+    w_dopa_predict = np.mean(w_dopa_predict, axis=4, keepdims=True)  # StrD1 is pre
 
-    # old code for matrix multiplication
-    # wITSTNSNr=np.zeros((5,16,16))
-    # wITStrD1SNr=np.zeros((5,16,16))
-    # wITStrD2GPe=np.zeros((5,16,16))
-    # for folder, simIDs in simulations:
-    #     for simID in simIDs:
-    #         w_ITStrD1=np.load('../data/'+folder+'/w_ITStrD1'+str(simID)+'.npy')
-    #         w_ITStrD2=np.load('../data/'+folder+'/w_ITStrD2'+str(simID)+'.npy')
-    #         w_ITSTN=np.load('../data/'+folder+'/w_ITSTN'+str(simID)+'.npy')
-    #         w_StrD1SNr=np.load('../data/'+folder+'/w_StrD1SNr'+str(simID)+'.npy')
-    #         w_StrD2GPe=np.load('../data/'+folder+'/w_StrD2GPe'+str(simID)+'.npy')
-    #         w_STNSNr=np.load('../data/'+folder+'/w_STNSNr'+str(simID)+'.npy')
+    # average over sim_ids the reversal order is the same for all sims
+    # (6,120,2,1)
+    w_direct = np.mean(w_direct, axis=0)
+    w_indirect = np.mean(w_indirect, axis=0)
+    w_hyperdirect = np.mean(w_hyperdirect, axis=0)
+    w_shortcut = np.mean(w_shortcut, axis=0)
+    # (6,120,1,1)
+    w_dopa_predict = np.mean(w_dopa_predict, axis=0)
 
-    #         trials=0
-    #         for idx in range(w_StrD1SNr.shape[0]):
-    #             if w_StrD1SNr[idx,:,:].sum()!=0:
-    #                 trials+=1
+    arrays = [w_direct, w_indirect, w_hyperdirect, w_shortcut]
 
-    #         for idx,t in enumerate([0,24,48,200,500]):
-    #             w1=np.transpose(w_ITSTN[t])
-    #             w2=np.transpose(w_STNSNr[t])
-    #             wITSTNSNr[idx]+=np.matmul(w1, w2)/float(num_simulations)
+    # Subplot titles for each row and column
+    subplot_titles = [
+        ["channel 0", "channel 1"],
+        ["", ""],
+        ["", ""],
+        ["", ""],
+    ]
+    subplot_ylabels = [
+        ["direct", ""],
+        ["indirect", ""],
+        ["hyperdirect", ""],
+        ["shortcut", ""],
+    ]
+    dbs_state_names = [
+        ["DBS-OFF", True],
+        ["suppression", True],
+        ["efferent", True],
+        ["afferent", False],
+        ["passing fibres GPe-STN", False],
+        ["dbs-all", True],
+    ]
 
-    #             w1=np.transpose(w_ITStrD1[t])
-    #             w2=np.transpose(w_StrD1SNr[t])
-    #             wITStrD1SNr[idx]+=np.matmul(w1, w2)/float(num_simulations)
+    fig, axes = plt.subplots(4, 2, figsize=(12, 8))
 
-    #             w1=np.transpose(w_ITStrD2[t])
-    #             w2=np.transpose(w_StrD2GPe[t])
-    #             wITStrD2GPe[idx]+=np.matmul(w1, w2)/float(num_simulations)
-    pass
+    # Plot each array on its respective subplot, splitting by the first dimension
+    for row_idx, (row_axes, title_row, ylabel_row) in enumerate(
+        zip(axes, subplot_titles, subplot_ylabels)
+    ):
+        # get ylim for the row
+        ylim = (
+            arrays[row_idx][
+                np.array([dbs_state_names[dbs][1] for dbs in range(n_dbs)]), :, :, 0
+            ].min(),
+            arrays[row_idx][
+                np.array([dbs_state_names[dbs][1] for dbs in range(n_dbs)]), :, :, 0
+            ].max(),
+        )
+        for column_idx, (ax, title, ylabel) in enumerate(
+            zip(row_axes, title_row, ylabel_row)
+        ):
+            # set ylim for the column
+            ax.set_ylim(ylim)
+            # activate grid
+            ax.grid(True)
+            # plot data
+            for dbs in range(n_dbs):
+                if dbs_state_names[dbs][1]:
+                    ax.plot(
+                        arrays[row_idx][dbs, :, column_idx, 0],
+                        label=dbs_state_names[dbs][0],
+                    )
+            # Set title and labels
+            if title != "":
+                ax.set_title(title)
+            if ylabel != "":
+                ax.set_ylabel(ylabel)
+            # Setting y-axis tick format to two decimal places
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f"{val:.2f}"))
+            # for last subplot add legend
+            if row_idx * 2 + column_idx == 7:
+                ax.legend()
+
+    # Set common labels and layout
+    # fig.suptitle("Title", fontsize=16)
+    fig.tight_layout(
+        # rect=[0, 0.03, 1, 0.95],
+    )
+
+    plt.show()
 
 
 #################################################################################################################
