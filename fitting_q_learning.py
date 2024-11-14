@@ -23,6 +23,7 @@ import pickle
 from scipy.special import logsumexp
 from scipy.optimize import minimize
 import seaborn as sns
+import sys
 
 
 def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
@@ -970,13 +971,13 @@ def create_param(
     estimates: tuple,
     std_of_mean: float,
     dbs_effect: tuple,
-    transform: str,
+    max: float,
 ):
     """
     Create a parameter in the model with a hierarchical structure. The parameter priors
-    are defined in a transformed space (group level mean, standard deviation of the
+    are defined in a transformed logit space (group level mean, standard deviation of the
     group level mean, standard deviation of the group of subjects). The parameter is
-    transformed to the original space using a given transformation.
+    transformed to the original space using a sigmoid function times max.
 
     Args:
         param_name (str):
@@ -985,38 +986,45 @@ def create_param(
             Dictionary containing the coordinates of the model.
         estimates (tuple):
             Tuple containing the group mean and standard deviation of the group of
-            subjects (in the original space).
+            subjects (in the original / the parameter's space).
         std_of_mean (float):
-            Standard deviation of the group-level mean (in the transformed space).
+            Standard deviation of the group-level mean (in the original / the
+            parameter's space).
         dbs_effect (tuple):
             Tuple containing the mean and standard deviation of the change of the
-            parameter by dbs (in the transformed space).
-        transform (str):
-            Transformation to apply to the parameter from the transformed space to
-            obtain the parameter in the original space. Either "sigmoid" (for parameter
-            between 0 and 1) or "exp" (for parameter > 0).
+            parameter by dbs (in the original / the parameter's space).
+        max (float):
+            Maximum value of the parameter in the original (the parameter's) space.
 
     Returns:
         pm.Deterministic:
             Deterministic variable representing the parameter in the original space.
     """
     # Group-level mean and standard deviation for parameter in the transformed space
-    if transform == "sigmoid":
-        mu_transformed, sigma_transformed = prior_in_logit(estimates[0], estimates[1])
-    elif transform == "exp":
-        mu_transformed, sigma_transformed = prior_in_log(estimates[0], estimates[1])
-    mean_global = pm.Normal(f"{param_name}_mean_global", mu_transformed, std_of_mean)
+    mu_transformed, sigma_transformed = prior_in_logit(
+        estimates[0] / max, estimates[1] / max
+    )
+    _, std_of_mean_transformed = prior_in_logit(estimates[0] / max, std_of_mean / max)
+    mean_global = pm.Normal(
+        f"{param_name}_mean_global", mu_transformed, std_of_mean_transformed
+    )
     sig_global = pm.Exponential(f"{param_name}_sig_global", 1.0 / sigma_transformed)
     # subject-level parameter non-centered parameterization
     z_subject = pm.Normal(f"{param_name}_z_subject", 0, 1, dims="subjects")
 
     # Group-level mean and standard deviation for the change of parameter by dbs in the
     # transformed space
+    _, dbs_effect_0_transformed = prior_in_logit(
+        estimates[0] / max, dbs_effect[0] / max
+    )
+    _, dbs_effect_1_transformed = prior_in_logit(
+        estimates[0] / max, dbs_effect[1] / max
+    )
     dbs_effect_mean_global = pm.Normal(
-        f"{param_name}_dbs_effect_mean_global", mu=0.0, sigma=dbs_effect[0]
+        f"{param_name}_dbs_effect_mean_global", mu=0.0, sigma=dbs_effect_0_transformed
     )
     dbs_effect_sig_global = pm.Exponential(
-        f"{param_name}_dbs_effect_sig_global", lam=1.0 / dbs_effect[1]
+        f"{param_name}_dbs_effect_sig_global", lam=1.0 / dbs_effect_1_transformed
     )
     # subject-level change of parameter by dbs non-centered parameterization
     z_subject_dbs_effect = pm.Normal(
@@ -1025,44 +1033,31 @@ def create_param(
 
     # Calculate parameter for each subject in each dbs condition in the transformed space
     # and then transform to the original space
-    if transform == "sigmoid":
-        return pm.Deterministic(
-            param_name,
-            pm.math.sigmoid(
-                (mean_global + z_subject * sig_global).dimshuffle(0, "x")
-                + (
-                    (
-                        dbs_effect_mean_global
-                        + z_subject_dbs_effect * dbs_effect_sig_global
-                    ).dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                )
-            ),
-            dims=("subjects", "dbs"),
-        )
-    elif transform == "exp":
-        return pm.Deterministic(
-            param_name,
-            pm.math.exp(
-                (mean_global + z_subject * sig_global).dimshuffle(0, "x")
-                + (
-                    (
-                        dbs_effect_mean_global
-                        + z_subject_dbs_effect * dbs_effect_sig_global
-                    ).dimshuffle(0, "x")
-                    * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
-                )
-            ),
-            dims=("subjects", "dbs"),
-        )
+    return pm.Deterministic(
+        param_name,
+        max
+        * pm.math.sigmoid(
+            (mean_global + z_subject * sig_global).dimshuffle(0, "x")
+            + (
+                (
+                    dbs_effect_mean_global
+                    + z_subject_dbs_effect * dbs_effect_sig_global
+                ).dimshuffle(0, "x")
+                * pt.arange(len(coords["dbs"])).dimshuffle("x", 0)
+            )
+        ),
+        dims=("subjects", "dbs"),
+    )
 
 
 if __name__ == "__main__":
 
-    save_folder = "results_fitting_q_learning_complete"
+    save_folder = f"results_fitting_q_learning_complete_new/{sys.argv[1]}"
     seed = 123
     tune = 7000
     draws = 15000
+    tune = 500  # TODO remove
+    draws = 1000  # TODO remove
     draws_prior = 2000
     target_accept = 0.975
     plot_patients = True
@@ -1072,186 +1067,201 @@ if __name__ == "__main__":
     az.style.use("arviz-darkgrid")
     rng = np.random.default_rng(seed)
 
-    # loading patient data
-    data_off = load_data_previously_selected(
-        subject_type="patient",
-        shortcut_type=None,
-        dbs_state="OFF",
-        dbs_variant=None,
-    )
-    data_on = load_data_previously_selected(
-        subject_type="patient",
-        shortcut_type=None,
-        dbs_state="ON",
-        dbs_variant=None,
-    )
-    n_subjects = len(data_off["subject"].unique())
+    if sys.argv[1] != "comparison":
 
-    # get mle estimates of alpha and beta for the patient data, patient data already
-    # only contains patients which did both dbs on and off
-    alpha_estimates, beta_estimates = get_mle_estimates(
-        data_on=data_on,
-        data_off=data_off,
-        plot_patients=plot_patients,
-        rng=rng,
-        plot_mle_estimates=plot_mle_estimates,
-        save_folder=save_folder,
-    )
+        # loading patient data
+        data_off = load_data_previously_selected(
+            subject_type="patient",
+            shortcut_type=None,
+            dbs_state="OFF",
+            dbs_variant=None,
+        )
+        data_on = load_data_previously_selected(
+            subject_type="patient",
+            shortcut_type=None,
+            dbs_state="ON",
+            dbs_variant=None,
+        )
+        n_subjects = len(data_off["subject"].unique())
+        n_subjects = 2  # TODO remove
 
-    # get actions, rewards, observed data arrays
-    actions_arr = np.empty((2, n_subjects), dtype=object)
-    rewards_arr = np.empty((2, n_subjects), dtype=object)
-    observed_list = []
-
-    for dbs in [0, 1]:
-        data = data_off if dbs == 0 else data_on
-        for subject_idx, subject in enumerate(data_off["subject"].unique()):
-            if subject_idx >= n_subjects:
-                break
-            actions = data[data["subject"] == subject]["choice"].values
-            actions_arr[dbs, subject_idx] = actions
-            rewards_arr[dbs, subject_idx] = data[data["subject"] == subject][
-                "reward"
-            ].values
-            observed_list.append(actions[1:])
-
-    observed_arr = np.concatenate(observed_list)
-
-    coords = {
-        "dbs": range(2),
-        "subjects": range(n_subjects),
-    }
-
-    # model with single learning rate
-    with pm.Model(coords=coords) as m_bernoulli_single:
-        # observed data
-        observed_data = pm.Data("observed_data", observed_arr)
-
-        alpha = create_param(
-            param_name="alpha",
-            coords=coords,
-            estimates=alpha_estimates,
-            std_of_mean=0.2,
-            dbs_effect=(0.1, 0.2),
-            transform="sigmoid",
+        # get mle estimates of alpha and beta for the patient data, patient data already
+        # only contains patients which did both dbs on and off
+        alpha_estimates, beta_estimates = get_mle_estimates(
+            data_on=data_on,
+            data_off=data_off,
+            plot_patients=plot_patients,
+            rng=rng,
+            plot_mle_estimates=plot_mle_estimates,
+            save_folder=save_folder,
         )
 
-        beta = create_param(
-            param_name="beta",
-            coords=coords,
-            estimates=beta_estimates,
-            std_of_mean=2.0,
-            dbs_effect=(3.0, 1.0),
-            transform="exp",
+        # get actions, rewards, observed data arrays
+        actions_arr = np.empty((2, n_subjects), dtype=object)
+        rewards_arr = np.empty((2, n_subjects), dtype=object)
+        observed_list = []
+
+        for dbs in [0, 1]:
+            data = data_off if dbs == 0 else data_on
+            for subject_idx, subject in enumerate(data_off["subject"].unique()):
+                if subject_idx >= n_subjects:
+                    break
+                actions = data[data["subject"] == subject]["choice"].values
+                actions_arr[dbs, subject_idx] = actions
+                rewards_arr[dbs, subject_idx] = data[data["subject"] == subject][
+                    "reward"
+                ].values
+                observed_list.append(actions[1:])
+
+        observed_arr = np.concatenate(observed_list)
+
+        coords = {
+            "dbs": range(2),
+            "subjects": range(n_subjects),
+        }
+
+    if sys.argv[1] == "single":
+        # model with single learning rate
+        with pm.Model(coords=coords) as m_bernoulli_single:
+            # observed data
+            observed_data = pm.Data("observed_data", observed_arr)
+
+            alpha = create_param(
+                param_name="alpha",
+                coords=coords,
+                estimates=(alpha_estimates[0], 0.1),
+                std_of_mean=0.1,
+                dbs_effect=(0.1, 0.1),
+                max=1.0,
+            )
+
+            beta = create_param(
+                param_name="beta",
+                coords=coords,
+                estimates=(beta_estimates[0], 2.0),
+                std_of_mean=1.0,
+                dbs_effect=(3.0, 1.0),
+                max=20.0,
+            )
+
+            # compute the probability of selecting action 1 after each trial, based on
+            # parameters
+            action_is_one_probs = pm.Deterministic(
+                "action_is_one_probs",
+                get_probabilities_single(
+                    coords,
+                    alpha,
+                    beta,
+                    actions_arr,
+                    rewards_arr,
+                ),
+            )
+
+            # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+            # likelihood with the computed probabilities
+            pm.Bernoulli(
+                name="like",
+                p=action_is_one_probs,
+                observed=observed_data,
+            )
+
+        idata_single = analyze_model(
+            name="single",
+            model=m_bernoulli_single,
+            save_folder=save_folder,
+            rng=rng,
+            chains=4,
+            tune=tune,
+            draws=draws,
+            draws_prior=draws_prior,
+            target_accept=target_accept,
         )
 
-        # compute the probability of selecting action 1 after each trial, based on
-        # parameters
-        action_is_one_probs = pm.Deterministic(
-            "action_is_one_probs",
-            get_probabilities_single(
-                coords,
-                alpha,
-                beta,
-                actions_arr,
-                rewards_arr,
-            ),
+    elif sys.argv[1] == "double":
+        # model with two learning rates
+        with pm.Model(coords=coords) as m_bernoulli_double:
+            # observed data
+            observed_data = pm.Data("observed_data", observed_arr)
+
+            alpha_plus = create_param(
+                param_name="alpha_plus",
+                coords=coords,
+                estimates=(alpha_estimates[0], 0.1),
+                std_of_mean=0.1,
+                dbs_effect=(0.1, 0.1),
+                max=1.0,
+            )
+
+            alpha_minus = create_param(
+                param_name="alpha_minus",
+                coords=coords,
+                estimates=(alpha_estimates[0], 0.1),
+                std_of_mean=0.1,
+                dbs_effect=(0.1, 0.1),
+                max=1.0,
+            )
+
+            beta = create_param(
+                param_name="beta",
+                coords=coords,
+                estimates=(beta_estimates[0], 2.0),
+                std_of_mean=1.0,
+                dbs_effect=(3.0, 1.0),
+                max=20.0,
+            )
+
+            # compute the probability of selecting action 1 after each trial based on
+            # parameters
+            action_is_one_probs = pm.Deterministic(
+                "action_is_one_probs",
+                get_probabilities_double(
+                    coords,
+                    alpha_plus,
+                    alpha_minus,
+                    beta,
+                    actions_arr,
+                    rewards_arr,
+                ),
+            )
+
+            # observed data (actions are either 0 or 1) can be modeled as Bernoulli
+            # likelihood with the computed probabilities
+            pm.Bernoulli(
+                name="like",
+                p=action_is_one_probs,
+                observed=observed_data,
+            )
+
+        idata_double = analyze_model(
+            name="double",
+            model=m_bernoulli_double,
+            save_folder=save_folder,
+            rng=rng,
+            chains=4,
+            tune=tune,
+            draws=draws,
+            draws_prior=draws_prior,
+            target_accept=target_accept,
         )
 
-        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
-        # likelihood with the computed probabilities
-        pm.Bernoulli(
-            name="like",
-            p=action_is_one_probs,
-            observed=observed_data,
+    elif sys.argv[1] == "comparison":
+
+        # load the inference data objects
+        idata_single = az.from_netcdf(
+            f"{save_folder[:-len(sys.argv[1])]+"/single"}/single_idata.nc"
+        )
+        idata_double = az.from_netcdf(
+            f"{save_folder[:-len(sys.argv[1])]+"/double"}/double_idata.nc"
         )
 
-    idata_single = analyze_model(
-        name="single",
-        model=m_bernoulli_single,
-        save_folder=save_folder,
-        rng=rng,
-        chains=4,
-        tune=tune,
-        draws=draws,
-        draws_prior=draws_prior,
-        target_accept=target_accept,
-    )
-
-    # model with two learning rates
-    with pm.Model(coords=coords) as m_bernoulli_double:
-        # observed data
-        observed_data = pm.Data("observed_data", observed_arr)
-
-        alpha_plus = create_param(
-            param_name="alpha_plus",
-            coords=coords,
-            estimates=alpha_estimates,
-            std_of_mean=0.2,
-            dbs_effect=(0.1, 0.2),
-            transform="sigmoid",
+        # model comparison using LOO (Leave-One-Out cross-validation)
+        df_comp_loo = az.compare(
+            {"m_bernoulli_single": idata_single, "m_bernoulli_double": idata_double}
         )
+        # print the comparison table in a text file
+        with open(f"{save_folder}/model_comparison.txt", "w") as f:
+            f.write(str(df_comp_loo))
 
-        alpha_minus = create_param(
-            param_name="alpha_minus",
-            coords=coords,
-            estimates=alpha_estimates,
-            std_of_mean=0.2,
-            dbs_effect=(0.1, 0.2),
-            transform="sigmoid",
-        )
-
-        beta = create_param(
-            param_name="beta",
-            coords=coords,
-            estimates=beta_estimates,
-            std_of_mean=2.0,
-            dbs_effect=(3.0, 1.0),
-            transform="exp",
-        )
-
-        # compute the probability of selecting action 1 after each trial based on
-        # parameters
-        action_is_one_probs = pm.Deterministic(
-            "action_is_one_probs",
-            get_probabilities_double(
-                coords,
-                alpha_plus,
-                alpha_minus,
-                beta,
-                actions_arr,
-                rewards_arr,
-            ),
-        )
-
-        # observed data (actions are either 0 or 1) can be modeled as Bernoulli
-        # likelihood with the computed probabilities
-        pm.Bernoulli(
-            name="like",
-            p=action_is_one_probs,
-            observed=observed_data,
-        )
-
-    idata_double = analyze_model(
-        name="double",
-        model=m_bernoulli_double,
-        save_folder=save_folder,
-        rng=rng,
-        chains=4,
-        tune=tune,
-        draws=draws,
-        draws_prior=draws_prior,
-        target_accept=target_accept,
-    )
-
-    # model comparison using LOO (Leave-One-Out cross-validation)
-    df_comp_loo = az.compare(
-        {"m_bernoulli_single": idata_single, "m_bernoulli_double": idata_double}
-    )
-    # print the comparison table in a text file
-    with open(f"{save_folder}/model_comparison.txt", "w") as f:
-        f.write(str(df_comp_loo))
-
-    # plot results of the model comparison
-    az.plot_compare(df_comp_loo, insample_dev=False)
-    plt.savefig(f"{save_folder}/model_comparison.png")
+        # plot results of the model comparison
+        az.plot_compare(df_comp_loo, insample_dev=False)
+        plt.savefig(f"{save_folder}/model_comparison.png")
