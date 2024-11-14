@@ -590,12 +590,20 @@ def load_data_previously_selected(
         # load data using pickle
         with open(file_name, "rb") as f:
             data_patients = pickle.load(f)
+        # load data about completed trials per session
+        completed = pd.read_json(
+            f"data/patient_data/Anz_CompleteTasks_{dbs_state}.json",
+            orient="records",
+            lines=True,
+        )
+        completed = completed.to_numpy().astype(int)
         # get the correct format for the data
         ret = {}
         ret["subject"] = []
         ret["trial"] = []
         ret["choice"] = []
         ret["reward"] = []
+        ret["session"] = []
         for subject in data_patients:
             for trial, choice in enumerate(
                 data_patients[subject][dbs_state]["choices"]
@@ -605,6 +613,12 @@ def load_data_previously_selected(
                 ret["choice"].append(choice)
             for reward in data_patients[subject][dbs_state]["rewards"]:
                 ret["reward"].append(reward)
+            # column for session (1, 2 or 3)
+            ret["session"].append(np.repeat(np.arange(1, 4), completed[subject, :]))
+
+        # concatenate the session column
+        ret["session"] = np.concatenate(ret["session"]).tolist()
+
         # choices should be 0 and 1
         ret["choice"] = (
             transform_range(np.array(ret["choice"]), new_min=0, new_max=1)
@@ -1088,11 +1102,11 @@ def estimate_p_explore_of_patients_process_subject(
     data,
     posterior,
     number_samples,
-    plot_patients,
     save_folder,
 ):
     actions = data[data["subject"] == subject]["choice"].values
     rewards = data[data["subject"] == subject]["reward"].values
+    session = data[data["subject"] == subject]["session"].values
 
     # for the current patient data during the current dbs state, estimate the q values
     # using the posterior samples of the parameters
@@ -1112,51 +1126,90 @@ def estimate_p_explore_of_patients_process_subject(
     qs_avg = np.mean(np.array(qs_list), axis=0)
     qs_std = np.std(np.array(qs_list), axis=0)
 
-    if plot_patients:
-        # create a figure plotting the q values of both actions through time
-        # adding points for the selected actions on the lines of the q values
-        plt.figure()
-        # fill the area between the standard deviations of the q values
-        plt.fill_between(
-            range(len(actions)),
-            qs_avg[:, 0] - qs_std[:, 0],
-            qs_avg[:, 0] + qs_std[:, 0],
-            color="r",
-            alpha=0.3,
-            edgecolor=None,
-            zorder=1,
+    az.style.use("default")
+    # create a figure plotting the q values of both actions through time
+    # adding points for the selected actions on the lines of the q values
+    plt.figure()
+    # fill the area between the standard deviations of the q values
+    plt.fill_between(
+        range(len(actions)),
+        qs_avg[:, 0] - qs_std[:, 0],
+        qs_avg[:, 0] + qs_std[:, 0],
+        color="r",
+        alpha=0.3,
+        edgecolor=None,
+        zorder=1,
+    )
+    plt.fill_between(
+        range(len(actions)),
+        qs_avg[:, 1] - qs_std[:, 1],
+        qs_avg[:, 1] + qs_std[:, 1],
+        color="b",
+        alpha=0.3,
+        edgecolor=None,
+        zorder=1,
+    )
+    # plot the q values of both actions as lines
+    plt.plot(range(len(actions)), qs_avg[:, 0], color="r", zorder=2)
+    plt.plot(range(len(actions)), qs_avg[:, 1], color="b", zorder=2)
+    # plot the selected actions on the lines of the q values
+    plt.scatter(
+        np.arange(len(actions)),
+        qs_avg[np.arange(len(actions)), actions],
+        marker="o",
+        facecolors=[
+            (
+                "k"
+                if qs_avg[i, int(actions[i])] >= qs_avg[i, int(1 - actions[i])]
+                else "none"
+            )
+            for i in range(len(actions))
+        ],
+        edgecolors="k",
+        zorder=3,
+    )
+    # plot vertical lines for session changes
+    session_borders = np.array(
+        [np.where(session == ses)[0][0] - 0.5 for ses in np.unique(session)]
+        + [len(actions) - 0.5]
+    )
+    for point in session_borders[1:-1]:
+        plt.axvline(point, color="k", linestyle="--", alpha=0.5, zorder=1)
+
+    # make x ticks centered in sessions (Session 1, Session 2, Session 3)
+    plt.xticks(
+        [
+            (session_borders[ses_id] + session_borders[ses_id + 1]) / 2.0
+            for ses_id in [0, 1, 2]
+        ],
+        [f"Session {ses}" for ses in np.unique(session)],
+    )
+    plt.xlim(session_borders[0], session_borders[-1])
+
+    # calculate the percentage of time the patient explores (selecting action with
+    # lower q value) for each session and write it as text above the x axis,
+    # centered in the sessions
+    p_explore = [
+        np.mean(
+            qs_avg[session == ses, actions[session == ses]]
+            < qs_avg[session == ses, 1 - actions[session == ses]]
         )
-        plt.fill_between(
-            range(len(actions)),
-            qs_avg[:, 1] - qs_std[:, 1],
-            qs_avg[:, 1] + qs_std[:, 1],
-            color="b",
-            alpha=0.3,
-            edgecolor=None,
-            zorder=1,
+        for ses in np.unique(session)
+    ]
+    for ses_id in [0, 1, 2]:
+        plt.text(
+            (session_borders[ses_id] + session_borders[ses_id + 1]) / 2.0,
+            plt.gca().get_ylim()[0]
+            + 0.01 * (plt.gca().get_ylim()[1] - plt.gca().get_ylim()[0]),
+            f"P(Explore)={round(p_explore[ses_id], 2)}",
+            ha="center",
+            va="bottom",
         )
-        # plot the q values of both actions as lines
-        plt.plot(range(len(actions)), qs_avg[:, 0], color="r", zorder=2)
-        plt.plot(range(len(actions)), qs_avg[:, 1], color="b", zorder=2)
-        # plot the selected actions on the lines of the q values
-        plt.scatter(
-            np.arange(len(actions)),
-            qs_avg[np.arange(len(actions)), actions],
-            marker="o",
-            facecolors=[
-                (
-                    "k"
-                    if qs_avg[i, int(actions[i])] >= qs_avg[i, int(1 - actions[i])]
-                    else "none"
-                )
-                for i in range(len(actions))
-            ],
-            edgecolors="k",
-            zorder=3,
-        )
-        plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
-        plt.savefig(f"{save_folder}/q_values_patient_{subject_idx}_dbs_{dbs}.png")
-        plt.close()
+    plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
+    plt.savefig(f"{save_folder}/q_values_patient_{subject_idx}_dbs_{dbs}.png", dpi=300)
+    plt.close()
+
+    return p_explore
 
 
 def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder):
@@ -1172,7 +1225,10 @@ def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder
         posterior[parameter] = vals.reshape((number_samples,) + vals.shape[2:])
 
     # loop over all patients and dbs states in parallel
-    tasks = []
+    task_list = []
+    dbs_list = []
+    subject_list = []
+    p_explore_list = []
     with ProcessPoolExecutor() as executor:
         for dbs, data in enumerate([data_off, data_on]):
             for subject_idx, subject in enumerate(data["subject"].unique()):
@@ -1186,13 +1242,33 @@ def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder
                     data,
                     posterior,
                     number_samples,
-                    plot_patients,
                     save_folder,
                 )
-                tasks.append(task)
+                task_list.append(task)
+                dbs_list.append(["OFF", "ON"][dbs])
+                subject_list.append(subject)
 
-        for task in tasks:
-            task.result()  # This waits for the task to complete if it hasn’t already
+        # for each subject / dbs state get the p_explore for the three sessions
+        for task in task_list:
+            p_explore = task.result()
+            p_explore_list.append(p_explore)
+    p_explore_arr = np.array(p_explore_list)
+
+    print(dbs_list)
+    print(subject_list)
+    print(p_explore_arr)
+
+    # create a dataframe with columns for the dbs state, subject, session and p_explore
+    p_explore_data = pd.DataFrame(
+        {
+            "dbs": dbs_list * 3,
+            "subject": subject_list * 3,
+            "session": np.repeat([1, 2, 3], len(subject_list)),
+            "p_explore": p_explore_arr.T.flatten(),
+        }
+    )
+
+    print(p_explore_data)
 
 
 if __name__ == "__main__":
