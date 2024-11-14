@@ -1212,7 +1212,7 @@ def estimate_p_explore_of_patients_process_subject(
     return p_explore
 
 
-def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder):
+def estimate_p_explore_of_patients(data_on, data_off, save_folder):
     # load the inference data object
     # TODO add + 'double/'
     idata = az.from_netcdf(f"{save_folder[:-len(sys.argv[1])]}double_idata.nc")
@@ -1494,6 +1494,5 @@ if __name__ == "__main__":
         estimate_p_explore_of_patients(
             data_on=data_on,
             data_off=data_off,
-            plot_patients=plot_patients,
             save_folder=save_folder,
         )
