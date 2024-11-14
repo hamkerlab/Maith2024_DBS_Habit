@@ -1050,6 +1050,29 @@ def create_param(
     )
 
 
+def estimate_p_explore_of_patients(
+    data_on, data_off, plot_patients, rng, plot_mle_estimates, save_folder
+):
+    # load the inference data object
+    save_folder = "results_fitting_q_learning_complete"
+    idata = az.from_netcdf(f"{save_folder}/double_idata.nc")
+    number_samples = np.prod(idata.posterior["beta"].values.shape[:2])
+
+    posterior = {}
+    for parameter in ["alpha_plus", "alpha_minus", "beta"]:
+        vals = idata.posterior[parameter].values
+        # first two dimensions are the chains and samples per chain -> combine them
+        posterior[parameter] = vals.reshape((number_samples,) + vals.shape[2:])
+
+    alpha_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
+    beta_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
+    # loop over patients data
+    for dbs, data in enumerate([data_off, data_on]):
+        for subject_idx, subject in enumerate(data["subject"].unique()):
+            actions = data[data["subject"] == subject]["choice"].values
+            rewards = data[data["subject"] == subject]["reward"].values
+
+
 if __name__ == "__main__":
 
     save_folder = f"results_fitting_q_learning_complete_new/{sys.argv[1]}"
@@ -1248,10 +1271,10 @@ if __name__ == "__main__":
 
         # load the inference data objects
         idata_single = az.from_netcdf(
-            f"{save_folder[:-len(sys.argv[1])]+"/single"}/single_idata.nc"
+            f"{save_folder[:-len(sys.argv[1])] + '/single'}single_idata.nc"
         )
         idata_double = az.from_netcdf(
-            f"{save_folder[:-len(sys.argv[1])]+"/double"}/double_idata.nc"
+            f"{save_folder[:-len(sys.argv[1])] + '/double'}double_idata.nc"
         )
 
         # model comparison using LOO (Leave-One-Out cross-validation)
