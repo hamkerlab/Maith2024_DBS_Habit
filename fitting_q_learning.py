@@ -24,6 +24,7 @@ from scipy.special import logsumexp
 from scipy.optimize import minimize
 import seaborn as sns
 import sys
+from concurrent.futures import ProcessPoolExecutor
 
 
 def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
@@ -1080,10 +1081,88 @@ def create_param(
     )
 
 
+def estimate_p_explore_of_patients_process_subject(
+    subject,
+    subject_idx,
+    dbs,
+    data,
+    posterior,
+    number_samples,
+    plot_patients,
+    save_folder,
+):
+    actions = data[data["subject"] == subject]["choice"].values
+    rewards = data[data["subject"] == subject]["reward"].values
+
+    # for the current patient data during the current dbs state, estimate the q values
+    # using the posterior samples of the parameters
+    qs_list = []
+    for sample in range(number_samples):
+        _, qs = llik_td_double(
+            (
+                posterior["alpha_plus"][sample, subject_idx, dbs],
+                posterior["alpha_minus"][sample, subject_idx, dbs],
+                posterior["beta"][sample, subject_idx, dbs],
+            ),
+            actions,
+            rewards,
+        )
+        qs_list.append(qs)
+    # average the q values over the samples
+    qs_avg = np.mean(np.array(qs_list), axis=0)
+    qs_std = np.std(np.array(qs_list), axis=0)
+
+    if plot_patients:
+        # create a figure plotting the q values of both actions through time
+        # adding points for the selected actions on the lines of the q values
+        plt.figure()
+        # fill the area between the standard deviations of the q values
+        plt.fill_between(
+            range(len(actions)),
+            qs_avg[:, 0] - qs_std[:, 0],
+            qs_avg[:, 0] + qs_std[:, 0],
+            color="r",
+            alpha=0.3,
+            edgecolor=None,
+            zorder=1,
+        )
+        plt.fill_between(
+            range(len(actions)),
+            qs_avg[:, 1] - qs_std[:, 1],
+            qs_avg[:, 1] + qs_std[:, 1],
+            color="b",
+            alpha=0.3,
+            edgecolor=None,
+            zorder=1,
+        )
+        # plot the q values of both actions as lines
+        plt.plot(range(len(actions)), qs_avg[:, 0], color="r", zorder=2)
+        plt.plot(range(len(actions)), qs_avg[:, 1], color="b", zorder=2)
+        # plot the selected actions on the lines of the q values
+        plt.scatter(
+            np.arange(len(actions)),
+            qs_avg[np.arange(len(actions)), actions],
+            marker="o",
+            facecolors=[
+                (
+                    "k"
+                    if qs_avg[i, int(actions[i])] >= qs_avg[i, int(1 - actions[i])]
+                    else "none"
+                )
+                for i in range(len(actions))
+            ],
+            edgecolors="k",
+            zorder=3,
+        )
+        plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
+        plt.savefig(f"{save_folder}/q_values_patient_{subject_idx}_dbs_{dbs}.png")
+        plt.close()
+
+
 def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder):
     # load the inference data object
-    save_folder = "results_fitting_q_learning_complete"
-    idata = az.from_netcdf(f"{save_folder}/double_idata.nc")
+    # TODO add + 'double/'
+    idata = az.from_netcdf(f"{save_folder[:-len(sys.argv[1])]}double_idata.nc")
     number_samples = np.prod(idata.posterior["beta"].values.shape[:2])
 
     posterior = {}
@@ -1092,53 +1171,38 @@ def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder
         # first two dimensions are the chains and samples per chain -> combine them
         posterior[parameter] = vals.reshape((number_samples,) + vals.shape[2:])
 
-    # loop over patients data
-    for dbs, data in enumerate([data_off, data_on]):
-        for subject_idx, subject in enumerate(data["subject"].unique()):
-            if subject_idx >= 2:
-                break  # TODO remove
-            actions = data[data["subject"] == subject]["choice"].values
-            rewards = data[data["subject"] == subject]["reward"].values
-
-            # for the patients data during the given dbs state, estimate the q values
-            # using the posterior samples of the parameters
-            qs_list = []
-            for sample in range(number_samples):
-                _, qs = llik_td_double(
-                    x=(
-                        posterior["alpha_plus"][sample, subject_idx, dbs],
-                        posterior["alpha_minus"][sample, subject_idx, dbs],
-                        posterior["beta"][sample, subject_idx, dbs],
-                    ),
-                    *(actions, rewards),
+    # loop over all patients and dbs states in parallel
+    tasks = []
+    with ProcessPoolExecutor() as executor:
+        for dbs, data in enumerate([data_off, data_on]):
+            for subject_idx, subject in enumerate(data["subject"].unique()):
+                if subject_idx >= 2:
+                    break  # TODO remove
+                task = executor.submit(
+                    estimate_p_explore_of_patients_process_subject,
+                    subject,
+                    subject_idx,
+                    dbs,
+                    data,
+                    posterior,
+                    number_samples,
+                    plot_patients,
+                    save_folder,
                 )
-                qs_list.append(qs)
-            # average the q values over the samples
-            qs_avg = np.mean(np.array(qs_list), axis=0)
+                tasks.append(task)
 
-            # create a figure plotting the q values of both actions ofer time
-            # adding points for the selected actions on the lines of the q values
-            if plot_patients:
-                plt.figure()
-                plt.plot(range(len(actions)), qs_avg[:, 0], color="r")
-                plt.plot(range(len(actions)), qs_avg[:, 1], color="b")
-                plt.scatter(
-                    np.arange(len(actions)) + 1,
-                    qs_avg[np.arange(len(actions)), actions],
-                    color="k",
-                )
-                plt.title(f"Subject {subject} DBS {['OFF', 'ON'][dbs]}")
-                plt.savefig(f"{save_folder}/q_values_patient_{subject}_dbs_{dbs}.png")
+        for task in tasks:
+            task.result()  # This waits for the task to complete if it hasn’t already
 
 
 if __name__ == "__main__":
 
-    save_folder = f"results_fitting_q_learning_complete_new/{sys.argv[1]}"
+    save_folder = f"results_fitting_q_learning_complete/{sys.argv[1]}"
     seed = 123
     tune = 7000
     draws = 15000
-    tune = 500  # TODO remove
-    draws = 1000  # TODO remove
+    # tune = 500  # TODO remove
+    # draws = 1000  # TODO remove
     draws_prior = 2000
     target_accept = 0.975
     plot_patients = True
@@ -1163,7 +1227,7 @@ if __name__ == "__main__":
             dbs_variant=None,
         )
         n_subjects = len(data_off["subject"].unique())
-        n_subjects = 2  # TODO remove
+        # n_subjects = 2  # TODO remove
 
     # prepare bayesian models
     if sys.argv[1] == "single" or sys.argv[1] == "double":
@@ -1202,8 +1266,8 @@ if __name__ == "__main__":
             "subjects": range(n_subjects),
         }
 
+    # model with single learning rate
     if sys.argv[1] == "single":
-        # model with single learning rate
         with pm.Model(coords=coords) as m_bernoulli_single:
             # observed data
             observed_data = pm.Data("observed_data", observed_arr)
@@ -1259,8 +1323,8 @@ if __name__ == "__main__":
             target_accept=target_accept,
         )
 
+    # model with two learning rates
     elif sys.argv[1] == "double":
-        # model with two learning rates
         with pm.Model(coords=coords) as m_bernoulli_double:
             # observed data
             observed_data = pm.Data("observed_data", observed_arr)
@@ -1326,8 +1390,8 @@ if __name__ == "__main__":
             target_accept=target_accept,
         )
 
+    # compare the models
     elif sys.argv[1] == "comparison":
-
         # load the inference data objects
         idata_single = az.from_netcdf(
             f"{save_folder[:-len(sys.argv[1])] + 'single/'}single_idata.nc"
@@ -1347,9 +1411,10 @@ if __name__ == "__main__":
         # plot results of the model comparison
         az.plot_compare(df_comp_loo, insample_dev=False)
         plt.savefig(f"{save_folder}/model_comparison.png")
+        plt.close("all")
 
+    # estimate the probability of exploration of the patients
     elif sys.argv[1] == "explore":
-        # estimate the probability of exploration of the patients
         estimate_p_explore_of_patients(
             data_on=data_on,
             data_off=data_off,
