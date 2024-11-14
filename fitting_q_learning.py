@@ -680,6 +680,36 @@ def llik_td(x, *args):
     return -np.sum(logp_actions[1:]), Qs
 
 
+def llik_td_double(x, *args):
+    # Extract the arguments as they are passed by scipy.optimize.minimize
+    alpha_plus, alpha_minus, beta = x
+    actions, rewards = args
+
+    # Initialize values
+    Qs = np.zeros((len(actions), 2))
+    Q = np.array([0.5, 0.5])
+    logp_actions = np.zeros(len(actions))
+
+    for t, (a, r) in enumerate(zip(actions, rewards)):
+        Qs[t] = Q
+        # Apply the softmax transformation
+        Q_ = Q * beta
+        logp_action = Q_ - logsumexp(Q_)
+
+        # Store the log probability of the observed action
+        logp_actions[t] = logp_action[a]
+
+        # Update the Q values for the next trial
+        if (r - Q[a]) > 0:
+            alpha = alpha_plus
+        else:
+            alpha = alpha_minus
+        Q[a] = Q[a] + alpha * (r - Q[a])
+
+    # Return the negative log likelihood of all observed actions
+    return -np.sum(logp_actions[1:]), Qs
+
+
 def mean_without_outlier(data: np.ndarray):
     # Calculate Q1 and Q3 (25th and 75th percentiles)
     q1, q3 = np.percentile(data, [25, 75])
@@ -1050,9 +1080,7 @@ def create_param(
     )
 
 
-def estimate_p_explore_of_patients(
-    data_on, data_off, plot_patients, rng, plot_mle_estimates, save_folder
-):
+def estimate_p_explore_of_patients(data_on, data_off, plot_patients, save_folder):
     # load the inference data object
     save_folder = "results_fitting_q_learning_complete"
     idata = az.from_netcdf(f"{save_folder}/double_idata.nc")
@@ -1064,13 +1092,43 @@ def estimate_p_explore_of_patients(
         # first two dimensions are the chains and samples per chain -> combine them
         posterior[parameter] = vals.reshape((number_samples,) + vals.shape[2:])
 
-    alpha_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
-    beta_patients_arr = np.empty((len(data_on["subject"].unique()), 2))
     # loop over patients data
     for dbs, data in enumerate([data_off, data_on]):
         for subject_idx, subject in enumerate(data["subject"].unique()):
+            if subject_idx >= 2:
+                break  # TODO remove
             actions = data[data["subject"] == subject]["choice"].values
             rewards = data[data["subject"] == subject]["reward"].values
+
+            # for the patients data during the given dbs state, estimate the q values
+            # using the posterior samples of the parameters
+            qs_list = []
+            for sample in range(number_samples):
+                _, qs = llik_td_double(
+                    x=(
+                        posterior["alpha_plus"][sample, subject_idx, dbs],
+                        posterior["alpha_minus"][sample, subject_idx, dbs],
+                        posterior["beta"][sample, subject_idx, dbs],
+                    ),
+                    *(actions, rewards),
+                )
+                qs_list.append(qs)
+            # average the q values over the samples
+            qs_avg = np.mean(np.array(qs_list), axis=0)
+
+            # create a figure plotting the q values of both actions ofer time
+            # adding points for the selected actions on the lines of the q values
+            if plot_patients:
+                plt.figure()
+                plt.plot(range(len(actions)), qs_avg[:, 0], color="r")
+                plt.plot(range(len(actions)), qs_avg[:, 1], color="b")
+                plt.scatter(
+                    np.arange(len(actions)) + 1,
+                    qs_avg[np.arange(len(actions)), actions],
+                    color="k",
+                )
+                plt.title(f"Subject {subject} DBS {['OFF', 'ON'][dbs]}")
+                plt.savefig(f"{save_folder}/q_values_patient_{subject}_dbs_{dbs}.png")
 
 
 if __name__ == "__main__":
@@ -1090,9 +1148,8 @@ if __name__ == "__main__":
     az.style.use("arviz-darkgrid")
     rng = np.random.default_rng(seed)
 
-    if sys.argv[1] != "comparison":
-
-        # loading patient data
+    # load the patient data
+    if sys.argv[1] == "single" or sys.argv[1] == "double" or sys.argv[1] == "explore":
         data_off = load_data_previously_selected(
             subject_type="patient",
             shortcut_type=None,
@@ -1108,6 +1165,8 @@ if __name__ == "__main__":
         n_subjects = len(data_off["subject"].unique())
         n_subjects = 2  # TODO remove
 
+    # prepare bayesian models
+    if sys.argv[1] == "single" or sys.argv[1] == "double":
         # get mle estimates of alpha and beta for the patient data, patient data already
         # only contains patients which did both dbs on and off
         alpha_estimates, beta_estimates = get_mle_estimates(
@@ -1271,10 +1330,10 @@ if __name__ == "__main__":
 
         # load the inference data objects
         idata_single = az.from_netcdf(
-            f"{save_folder[:-len(sys.argv[1])] + '/single'}single_idata.nc"
+            f"{save_folder[:-len(sys.argv[1])] + 'single/'}single_idata.nc"
         )
         idata_double = az.from_netcdf(
-            f"{save_folder[:-len(sys.argv[1])] + '/double'}double_idata.nc"
+            f"{save_folder[:-len(sys.argv[1])] + 'double/'}double_idata.nc"
         )
 
         # model comparison using LOO (Leave-One-Out cross-validation)
@@ -1288,3 +1347,12 @@ if __name__ == "__main__":
         # plot results of the model comparison
         az.plot_compare(df_comp_loo, insample_dev=False)
         plt.savefig(f"{save_folder}/model_comparison.png")
+
+    elif sys.argv[1] == "explore":
+        # estimate the probability of exploration of the patients
+        estimate_p_explore_of_patients(
+            data_on=data_on,
+            data_off=data_off,
+            plot_patients=plot_patients,
+            save_folder=save_folder,
+        )
