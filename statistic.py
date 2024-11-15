@@ -80,6 +80,23 @@ def mean_data(result):
 
 
 #############################################################################################################
+###################################### calculate averages for 5 trials ######################################
+#############################################################################################################
+
+
+def mean_data_line(result):
+    number_result = len(result)
+
+    if number_result > 1:
+        # mean of 24 colums (axis=0)
+        mean = np.nanmean(result, axis=0)
+    else:
+        mean = result[0]
+
+    return mean
+
+
+#############################################################################################################
 ############################# calculate averages (patient data) for 3 sessions ##############################
 #############################################################################################################
 
@@ -260,6 +277,43 @@ def processing_habit_data(data, number_of_persons):
 
         if i == 0:
             result = [habit_sessions]
+        else:
+            result = np.vstack([result, habit_sessions])
+
+    return result
+
+
+#############################################################################################################
+################################# total unrewarded decisions for 5 trials ###################################
+#############################################################################################################
+
+
+def processing_line(data, number_of_persons):
+
+    number_data = len(data[0])
+    if number_data < number_of_persons:
+        number_of_persons = number_data
+
+    result = []
+
+    for i in range(number_of_persons):
+        habit_sessions = []
+
+        # 24 sessions, 5 trials per session
+        for j in range(24):
+            # start- and endindex
+            start_idx = j * 5
+            end_idx = start_idx + 5
+
+            # total 5 trials
+            reward_sum = np.sum(data[start_idx:end_idx, i])
+
+            # unrewarded decitions
+            adjusted_sum = 5 - reward_sum
+            habit_sessions.append(adjusted_sum)
+
+        if i == 0:
+            result = np.array([habit_sessions])
         else:
             result = np.vstack([result, habit_sessions])
 
