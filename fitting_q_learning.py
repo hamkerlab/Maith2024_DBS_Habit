@@ -562,7 +562,7 @@ def analyze_model(
     return idata
 
 
-def load_data_previously_selected(
+def load_experimental_data(
     subject_type: str,
     shortcut_type: str,
     dbs_state: str,
@@ -583,7 +583,7 @@ def load_data_previously_selected(
 
     Returns:
         pd.DataFrame:
-            DataFrame containing the subject, trial, choice and reward columns
+            DataFrame containing the subject, trial, choice, reward and session columns
     """
     # data needs to be loaded differently for patients/simulations
     if subject_type == "patient":
@@ -650,6 +650,7 @@ def load_data_previously_selected(
         ret["trial"] = []
         ret["choice"] = []
         ret["reward"] = []
+        ret["session"] = []
         for sim_id in range(100):
             with open(file_name(sim_id), "rb") as f:
                 data_patients = pickle.load(f)
@@ -660,6 +661,18 @@ def load_data_previously_selected(
                     ret["choice"].append(choice + 1)
                 for reward in data_patients["rewards"]:
                     ret["reward"].append(reward)
+            # column for session (1, 2 or 3), each session has 40 trials
+            ret["session"].append(np.repeat(np.arange(1, 4), 40))
+
+        # concatenate the session column
+        ret["session"] = np.concatenate(ret["session"]).tolist()
+
+        # choices should be 0 and 1
+        ret["choice"] = (
+            transform_range(np.array(ret["choice"]), new_min=0, new_max=1)
+            .astype(int)
+            .tolist()
+        )
 
     return pd.DataFrame(ret)
 
@@ -1097,13 +1110,7 @@ def create_param(
 
 
 def estimate_p_explore_of_patients_process_subject(
-    subject,
-    subject_idx,
-    dbs,
-    data,
-    posterior,
-    number_samples,
-    save_folder,
+    subject, subject_idx, dbs, data, posterior, number_samples, save_folder, inference
 ):
     actions = data[data["subject"] == subject]["choice"].values
     rewards = data[data["subject"] == subject]["reward"].values
@@ -1210,16 +1217,19 @@ def estimate_p_explore_of_patients_process_subject(
             va="bottom",
         )
     plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
-    plt.savefig(f"{save_folder}/q_values_patient_{subject_idx}_dbs_{dbs}.png", dpi=300)
+    plt.savefig(
+        f"{save_folder}/q_values_{inference}_subject_{subject_idx}_dbs_{dbs}.png",
+        dpi=300,
+    )
     plt.close()
 
     return p_explore
 
 
-def estimate_p_explore_of_patients(data_on, data_off, save_folder):
+def estimate_p_explore_of_patients(data_on, data_off, save_folder, inference):
     # load the inference data object
     idata = az.from_netcdf(
-        f"{save_folder[:-len(sys.argv[1])] + 'double/'}double_idata.nc"
+        f"{save_folder[:-len(sys.argv[1])]}{inference}/{inference}_idata.nc"
     )
     number_samples = np.prod(idata.posterior["beta"].values.shape[:2])
 
@@ -1237,6 +1247,8 @@ def estimate_p_explore_of_patients(data_on, data_off, save_folder):
     with ProcessPoolExecutor() as executor:
         for dbs, data in enumerate([data_off, data_on]):
             for subject_idx, subject in enumerate(data["subject"].unique()):
+                # if subject_idx >= 2:
+                #     break  # TODO remove
                 task = executor.submit(
                     estimate_p_explore_of_patients_process_subject,
                     subject,
@@ -1246,6 +1258,7 @@ def estimate_p_explore_of_patients(data_on, data_off, save_folder):
                     posterior,
                     number_samples,
                     save_folder,
+                    inference,
                 )
                 task_list.append(task)
                 dbs_list.append(["OFF", "ON"][dbs])
@@ -1274,7 +1287,7 @@ def estimate_p_explore_of_patients(data_on, data_off, save_folder):
     print(p_explore_data)
     # Save the variable
     p_explore_data.to_json(
-        f"{save_folder}/p_explore_data.json", orient="records", lines=True
+        f"{save_folder}/p_explore_{inference}.json", orient="records", lines=True
     )
 
 
@@ -1295,25 +1308,28 @@ if __name__ == "__main__":
     az.style.use("arviz-darkgrid")
     rng = np.random.default_rng(seed)
 
-    # load the patient data
-    if sys.argv[1] == "single" or sys.argv[1] == "double" or sys.argv[1] == "explore":
-        data_off = load_data_previously_selected(
+    # get mle estimates from patients data
+    if (
+        sys.argv[1] == "single"
+        or sys.argv[1] == "double"
+        or sys.argv[1] == "suppression"
+        or sys.argv[1] == "efferent"
+        or sys.argv[1] == "dbs-all"
+    ):
+        # load patient data
+        data_off = load_experimental_data(
             subject_type="patient",
             shortcut_type=None,
             dbs_state="OFF",
             dbs_variant=None,
         )
-        data_on = load_data_previously_selected(
+        data_on = load_experimental_data(
             subject_type="patient",
             shortcut_type=None,
             dbs_state="ON",
             dbs_variant=None,
         )
-        n_subjects = len(data_off["subject"].unique())
-        # n_subjects = 2  # TODO remove
 
-    # prepare bayesian models
-    if sys.argv[1] == "single" or sys.argv[1] == "double":
         # get mle estimates of alpha and beta for the patient data, patient data already
         # only contains patients which did both dbs on and off
         alpha_estimates, beta_estimates = get_mle_estimates(
@@ -1324,6 +1340,39 @@ if __name__ == "__main__":
             plot_mle_estimates=plot_mle_estimates,
             save_folder=save_folder,
         )
+
+    # if working with simulations, overwrite the experimental data
+    if (
+        sys.argv[1] == "suppression"
+        or sys.argv[1] == "efferent"
+        or sys.argv[1] == "dbs-all"
+    ):
+        #  load simulation data
+        data_off = load_experimental_data(
+            subject_type="simulation",
+            shortcut_type="plastic",
+            dbs_state="OFF",
+            dbs_variant=None,
+        )
+        data_on = load_experimental_data(
+            subject_type="simulation",
+            shortcut_type="plastic",
+            dbs_state="ON",
+            dbs_variant=sys.argv[1],
+        )
+
+    # prepare bayesian models
+    if (
+        sys.argv[1] == "single"
+        or sys.argv[1] == "double"
+        or sys.argv[1] == "suppression"
+        or sys.argv[1] == "efferent"
+        or sys.argv[1] == "dbs-all"
+    ):
+
+        # set the number of subjects to use
+        n_subjects = len(data_off["subject"].unique())
+        # n_subjects = 2  # TODO remove
 
         # get actions, rewards, observed data arrays
         actions_arr = np.empty((2, n_subjects), dtype=object)
@@ -1395,7 +1444,7 @@ if __name__ == "__main__":
             )
 
         idata_single = analyze_model(
-            name="single",
+            name=sys.argv[1],
             model=m_bernoulli_single,
             save_folder=save_folder,
             rng=rng,
@@ -1407,7 +1456,12 @@ if __name__ == "__main__":
         )
 
     # model with two learning rates
-    elif sys.argv[1] == "double":
+    elif (
+        sys.argv[1] == "double"
+        or sys.argv[1] == "suppression"
+        or sys.argv[1] == "efferent"
+        or sys.argv[1] == "dbs-all"
+    ):
         with pm.Model(coords=coords) as m_bernoulli_double:
             # observed data
             observed_data = pm.Data("observed_data", observed_arr)
@@ -1462,7 +1516,7 @@ if __name__ == "__main__":
             )
 
         idata_double = analyze_model(
-            name="double",
+            name=sys.argv[1],
             model=m_bernoulli_double,
             save_folder=save_folder,
             rng=rng,
@@ -1498,12 +1552,49 @@ if __name__ == "__main__":
 
     # estimate the probability of exploration of the patients
     elif sys.argv[1] == "get_explore":
+        # TODO load data on and data off and adjust for patients + simulations, currently only simulations
         # get the p explore data
-        estimate_p_explore_of_patients(
-            data_on=data_on,
-            data_off=data_off,
-            save_folder=save_folder,
-        )
+        inference_types = ["double", "suppression", "efferent", "dbs-all"]
+        # inference_types = ["suppression"]  # TODO remove
+        for inference in inference_types:
+            if inference == "double":
+                # load patient data
+                data_off = load_experimental_data(
+                    subject_type="patient",
+                    shortcut_type=None,
+                    dbs_state="OFF",
+                    dbs_variant=None,
+                )
+                data_on = load_experimental_data(
+                    subject_type="patient",
+                    shortcut_type=None,
+                    dbs_state="ON",
+                    dbs_variant=None,
+                )
+            elif (
+                inference == "suppression"
+                or inference == "efferent"
+                or inference == "dbs-all"
+            ):
+                #  load simulation data
+                data_off = load_experimental_data(
+                    subject_type="simulation",
+                    shortcut_type="plastic",
+                    dbs_state="OFF",
+                    dbs_variant=None,
+                )
+                data_on = load_experimental_data(
+                    subject_type="simulation",
+                    shortcut_type="plastic",
+                    dbs_state="ON",
+                    dbs_variant=inference,
+                )
+            estimate_p_explore_of_patients(
+                data_on=data_on,
+                data_off=data_off,
+                save_folder=save_folder,
+                inference=inference,
+            )
 
     elif sys.argv[1] == "analyze_explore":
         # load the p explore data
