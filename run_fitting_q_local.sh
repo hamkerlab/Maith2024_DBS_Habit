@@ -12,3 +12,9 @@ wait $pid2
 
 # Run comparison
 PYTENSOR_FLAGS='base_compiledir=./pytensor_compile'  python fitting_q_learning.py comparison
+
+# get p explore estimates
+python fitting_q_learning.py get_explore
+
+# analyze p explore
+python fitting_q_learning.py analyze_explore

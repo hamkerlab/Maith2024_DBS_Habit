@@ -25,6 +25,7 @@ from scipy.optimize import minimize
 import seaborn as sns
 import sys
 from concurrent.futures import ProcessPoolExecutor
+import pingouin as pg
 
 
 def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
@@ -1173,6 +1174,9 @@ def estimate_p_explore_of_patients_process_subject(
         [np.where(session == ses)[0][0] - 0.5 for ses in np.unique(session)]
         + [len(actions) - 0.5]
     )
+    # one patient has no trials in third session... add it manually to session_borders
+    if len(session_borders) == 3:
+        session_borders = np.append(session_borders, len(actions) + 40 - 0.5)
     for point in session_borders[1:-1]:
         plt.axvline(point, color="k", linestyle="--", alpha=0.5, zorder=1)
 
@@ -1182,7 +1186,7 @@ def estimate_p_explore_of_patients_process_subject(
             (session_borders[ses_id] + session_borders[ses_id + 1]) / 2.0
             for ses_id in [0, 1, 2]
         ],
-        [f"Session {ses}" for ses in np.unique(session)],
+        [f"Session {ses}" for ses in [1, 2, 3]],
     )
     plt.xlim(session_borders[0], session_borders[-1])
 
@@ -1194,7 +1198,7 @@ def estimate_p_explore_of_patients_process_subject(
             qs_avg[session == ses, actions[session == ses]]
             < qs_avg[session == ses, 1 - actions[session == ses]]
         )
-        for ses in np.unique(session)
+        for ses in [1, 2, 3]
     ]
     for ses_id in [0, 1, 2]:
         plt.text(
@@ -1214,8 +1218,9 @@ def estimate_p_explore_of_patients_process_subject(
 
 def estimate_p_explore_of_patients(data_on, data_off, save_folder):
     # load the inference data object
-    # TODO add + 'double/'
-    idata = az.from_netcdf(f"{save_folder[:-len(sys.argv[1])]}double_idata.nc")
+    idata = az.from_netcdf(
+        f"{save_folder[:-len(sys.argv[1])] + 'double/'}double_idata.nc"
+    )
     number_samples = np.prod(idata.posterior["beta"].values.shape[:2])
 
     posterior = {}
@@ -1232,8 +1237,6 @@ def estimate_p_explore_of_patients(data_on, data_off, save_folder):
     with ProcessPoolExecutor() as executor:
         for dbs, data in enumerate([data_off, data_on]):
             for subject_idx, subject in enumerate(data["subject"].unique()):
-                if subject_idx >= 2:
-                    break  # TODO remove
                 task = executor.submit(
                     estimate_p_explore_of_patients_process_subject,
                     subject,
@@ -1269,6 +1272,10 @@ def estimate_p_explore_of_patients(data_on, data_off, save_folder):
     )
 
     print(p_explore_data)
+    # Save the variable
+    p_explore_data.to_json(
+        f"{save_folder}/p_explore_data.json", orient="records", lines=True
+    )
 
 
 if __name__ == "__main__":
@@ -1490,9 +1497,56 @@ if __name__ == "__main__":
         plt.close("all")
 
     # estimate the probability of exploration of the patients
-    elif sys.argv[1] == "explore":
+    elif sys.argv[1] == "get_explore":
+        # get the p explore data
         estimate_p_explore_of_patients(
             data_on=data_on,
             data_off=data_off,
             save_folder=save_folder,
         )
+
+    elif sys.argv[1] == "analyze_explore":
+        # load the p explore data
+        p_explore_data = pd.read_json(
+            f"{save_folder}/p_explore_data.json",
+            orient="records",
+            lines=True,
+        )
+        # plot the p explore data as boxplots with factors dbs and session using seaborn
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(x="session", y="p_explore", hue="dbs", data=p_explore_data)
+
+        # Plot the mean of the different groups
+        sns.pointplot(
+            x="session",
+            y="p_explore",
+            hue="dbs",
+            data=p_explore_data,
+            dodge=0.532,
+            join=False,
+            palette="dark",
+            markers="o",
+            scale=0.75,
+            ci=None,
+        )
+
+        plt.title("P(Explore) by DBS State and Session")
+        plt.xlabel("Session")
+        plt.ylabel("P(Explore)")
+        plt.legend(title="DBS State", loc="upper right")
+        plt.tight_layout()
+        plt.savefig(f"{save_folder}/p_explore_boxplot.png")
+        plt.close()
+
+        # Perform a two-way repeated measures ANOVA using pingouin
+        aov = pg.rm_anova(
+            dv="p_explore",
+            within=["dbs", "session"],
+            subject="subject",
+            data=p_explore_data,
+            detailed=True,
+        )
+        print(aov)
+
+        # Save the ANOVA results to a CSV file
+        aov.to_csv(f"{save_folder}/p_explore_anova_results.csv", index=False)
