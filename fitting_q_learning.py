@@ -1372,12 +1372,12 @@ if __name__ == "__main__":
 
         # set the number of subjects to use
         n_subjects = len(data_off["subject"].unique())
-        n_subjects = 2  # TODO remove
+        # n_subjects = 2  # TODO remove
 
         # for plotting priors and posteriors many subplots are created (as many as there
         # are subjects), adjust the max subplots parameter for the number of subjects
         az.rcParams["plot.max_subplots"] = max(
-            az.rcParams["plot.max_subplots"], n_subjects
+            az.rcParams["plot.max_subplots"], n_subjects * 2
         )
 
         # get actions, rewards, observed data arrays
