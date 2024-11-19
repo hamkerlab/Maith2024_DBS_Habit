@@ -1109,7 +1109,7 @@ def create_param(
     )
 
 
-def estimate_p_explore_of_patients_process_subject(
+def estimate_p_explore_process_subject(
     subject, subject_idx, dbs, data, posterior, number_samples, save_folder, inference
 ):
     actions = data[data["subject"] == subject]["choice"].values
@@ -1226,7 +1226,7 @@ def estimate_p_explore_of_patients_process_subject(
     return p_explore
 
 
-def estimate_p_explore_of_patients(data_on, data_off, save_folder, inference):
+def estimate_p_explore(data_on, data_off, save_folder, inference):
     # load the inference data object
     idata = az.from_netcdf(
         f"{save_folder[:-len(sys.argv[1])]}{inference}/{inference}_idata.nc"
@@ -1250,7 +1250,7 @@ def estimate_p_explore_of_patients(data_on, data_off, save_folder, inference):
                 # if subject_idx >= 2:
                 #     break  # TODO remove
                 task = executor.submit(
-                    estimate_p_explore_of_patients_process_subject,
+                    estimate_p_explore_process_subject,
                     subject,
                     subject_idx,
                     dbs,
@@ -1372,7 +1372,13 @@ if __name__ == "__main__":
 
         # set the number of subjects to use
         n_subjects = len(data_off["subject"].unique())
-        # n_subjects = 2  # TODO remove
+        n_subjects = 2  # TODO remove
+
+        # for plotting priors and posteriors many subplots are created (as many as there
+        # are subjects), adjust the max subplots parameter for the number of subjects
+        az.rcParams["plot.max_subplots"] = max(
+            az.rcParams["plot.max_subplots"], n_subjects
+        )
 
         # get actions, rewards, observed data arrays
         actions_arr = np.empty((2, n_subjects), dtype=object)
@@ -1552,7 +1558,6 @@ if __name__ == "__main__":
 
     # estimate the probability of exploration of the patients
     elif sys.argv[1] == "get_explore":
-        # TODO load data on and data off and adjust for patients + simulations, currently only simulations
         # get the p explore data
         inference_types = ["double", "suppression", "efferent", "dbs-all"]
         # inference_types = ["suppression"]  # TODO remove
@@ -1589,7 +1594,7 @@ if __name__ == "__main__":
                     dbs_state="ON",
                     dbs_variant=inference,
                 )
-            estimate_p_explore_of_patients(
+            estimate_p_explore(
                 data_on=data_on,
                 data_off=data_off,
                 save_folder=save_folder,
