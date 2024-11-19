@@ -1602,47 +1602,50 @@ if __name__ == "__main__":
             )
 
     elif sys.argv[1] == "analyze_explore":
-        # load the p explore data
-        p_explore_data = pd.read_json(
-            f"{save_folder}/p_explore_data.json",
-            orient="records",
-            lines=True,
-        )
-        # plot the p explore data as boxplots with factors dbs and session using seaborn
-        plt.figure(figsize=(10, 6))
-        sns.boxplot(x="session", y="p_explore", hue="dbs", data=p_explore_data)
+        for inference in ["double", "suppression", "efferent", "dbs-all"]:
+            # load the p explore data
+            p_explore_data = pd.read_json(
+                f"{save_folder[:-len(sys.argv[1])]}get_explore/p_explore_{inference}.json",
+                orient="records",
+                lines=True,
+            )
 
-        # Plot the mean of the different groups
-        sns.pointplot(
-            x="session",
-            y="p_explore",
-            hue="dbs",
-            data=p_explore_data,
-            dodge=0.532,
-            join=False,
-            palette="dark",
-            markers="o",
-            scale=0.75,
-            ci=None,
-        )
+            # plot the p explore data as boxplots with factors dbs and session using seaborn
+            az.style.use("default")
+            plt.figure(figsize=(10, 6))
+            sns.boxplot(
+                x="session",
+                y="p_explore",
+                hue="dbs",
+                data=p_explore_data,
+                palette={"ON": "red", "OFF": "blue"},
+                showmeans=True,
+                meanprops={
+                    # "marker": "o",
+                    "markerfacecolor": "black",
+                    "markeredgecolor": "white",
+                    # "markersize": 8,
+                },
+                linecolor="black",
+            )
 
-        plt.title("P(Explore) by DBS State and Session")
-        plt.xlabel("Session")
-        plt.ylabel("P(Explore)")
-        plt.legend(title="DBS State", loc="upper right")
-        plt.tight_layout()
-        plt.savefig(f"{save_folder}/p_explore_boxplot.png")
-        plt.close()
+            plt.title(f"P(Explore) {inference}")
+            plt.xlabel("Session")
+            plt.ylabel("P(Explore)")
+            plt.legend(title="DBS State", loc="upper left")
+            plt.tight_layout()
+            plt.savefig(f"{save_folder}/p_explore_boxplot_{inference}.png")
+            plt.close()
 
-        # Perform a two-way repeated measures ANOVA using pingouin
-        aov = pg.rm_anova(
-            dv="p_explore",
-            within=["dbs", "session"],
-            subject="subject",
-            data=p_explore_data,
-            detailed=True,
-        )
-        print(aov)
+            # Perform a two-way repeated measures ANOVA using pingouin
+            aov = pg.rm_anova(
+                dv="p_explore",
+                within=["dbs", "session"],
+                subject="subject",
+                data=p_explore_data,
+                detailed=True,
+            )
+            print(aov)
 
-        # Save the ANOVA results to a CSV file
-        aov.to_csv(f"{save_folder}/p_explore_anova_results.csv", index=False)
+            # Save the ANOVA results to a CSV file
+            aov.to_csv(f"{save_folder}/p_explore_anova_{inference}.csv", index=False)
