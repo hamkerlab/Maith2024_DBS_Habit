@@ -603,7 +603,7 @@ def create_network(seed, dbs_state, shortcut, parameter, dbs_param_state):
                 auto_implement=True,
             )
 
-        # dbs_state = 5 -> dbs-all
+        # dbs_state = 5 -> dbs-comb
         if dbs_state == 5:
             dbs = DBSstimulator(
                 stimulated_population=GPi,
@@ -691,7 +691,7 @@ def create_network(seed, dbs_state, shortcut, parameter, dbs_param_state):
                 auto_implement=True,
             )
 
-        # dbs_state = 5 -> dbs-all
+        # dbs_state = 5 -> dbs-comb
         if dbs_state == 5:
             dbs = DBSstimulator(
                 stimulated_population=GPi,

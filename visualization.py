@@ -512,7 +512,7 @@ def dbs_on_off_14_and_100(switch):
         "suppression",
         "efferent",
         "passing-fibres",
-        "dbs-all",
+        "dbs-comb",
         # "dbs-off",
     ]
 
@@ -824,8 +824,8 @@ def activity_changes_dbs_on():
             "error_afferent": table_error_dbs4,
             "mean_passing-fibres": table_mean_dbs5,
             "error_passing-fibres": table_error_dbs5,
-            "mean_dbs-all": table_mean_dbs6,
-            "error_dbs-all": table_error_dbs6,
+            "mean_dbs-comb": table_mean_dbs6,
+            "error_dbs-comb": table_error_dbs6,
         }
 
         filename = "statistic/mean_error_table_fig4"
@@ -906,7 +906,7 @@ def activity_changes_dbs_on():
             "suppression",
             "efferent",
             "passing-fibres",
-            "dbs-all",
+            "dbs-comb",
             # "dbs-off",
         ]
 
@@ -1133,7 +1133,7 @@ def activity_changes_dbs_on():
         axs[4].set_xticklabels([""] * 5)  # Entferne die Labels
 
         # title
-        axs[4].set_title("dbs-all", fontweight="bold", fontsize=label_size)
+        axs[4].set_title("dbs-comb", fontweight="bold", fontsize=label_size)
 
         # Adjust layout to minimize margins
         # plt.subplots_adjust(left=0.07, right=0.96, top=0.9, bottom=0.15, wspace=0.2)
@@ -1404,7 +1404,7 @@ def load_simulate():
     resultON = []
 
     for i in range(1, 3):
-        # without afferent and passing-fibres and dbs-all
+        # without afferent and passing-fibres and dbs-comb
         if i == 3:
             continue
         if i == 4 and passingoff:
@@ -1495,9 +1495,9 @@ def load_simulate():
 
     # legend
     if passingoff:
-        legend = ["suppression", "efferent"]  # , "dbs-all"]
+        legend = ["suppression", "efferent"]  # , "dbs-comb"]
     else:
-        legend = ["suppression", "efferent", "passing-fibres", "dbs-all"]
+        legend = ["suppression", "efferent", "passing-fibres", "dbs-comb"]
 
     # plot size
     fig, ax = plt.subplots(figsize=(5, 3))
@@ -1608,7 +1608,7 @@ def load_simulate_dbsall():
     resultON = []
 
     for i in range(1, 6):
-        # without afferent and passing-fibres and dbs-all
+        # without afferent and passing-fibres and dbs-comb
         if i == 2:
             continue
         if i == 3:
@@ -1712,9 +1712,9 @@ def load_simulate_dbsall():
 
     # legend
     if passingoff:
-        legend = ["suppression", "dbs-all"]
+        legend = ["suppression", "dbs-comb"]
     else:
-        legend = ["suppression", "efferent", "passing-fibres", "dbs-all"]
+        legend = ["suppression", "efferent", "passing-fibres", "dbs-comb"]
 
     # plot size
     fig, ax = plt.subplots(figsize=(5, 3))

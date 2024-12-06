@@ -535,12 +535,12 @@ def save_mean_error(number_of_persons):
             error_shortoff5[1],
             error_shortoff5[2],
         ],
-        "dbs-all mean": [
+        "dbs-comb mean": [
             mean_shortoff6[0],
             mean_shortoff6[1],
             mean_shortoff6[2],
         ],
-        "dbs-all standard deviation": [
+        "dbs-comb standard deviation": [
             error_shortoff6[0],
             error_shortoff6[1],
             error_shortoff6[2],
@@ -615,12 +615,12 @@ def save_mean_error(number_of_persons):
             error_shorton5[1],
             error_shorton5[2],
         ],
-        "dbs-all mean": [
+        "dbs-comb mean": [
             mean_shorton6[0],
             mean_shorton6[1],
             mean_shorton6[2],
         ],
-        "dbs-all standard deviation": [
+        "dbs-comb standard deviation": [
             error_shorton6[0],
             error_shorton6[1],
             error_shorton6[2],
@@ -987,7 +987,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 "efferent",
                 "afferent",
                 "passing fibres",
-                "dbs-all",
+                "dbs-comb",
             ],
             "S1 t": [],
             "S1 p": [],
@@ -1117,7 +1117,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
         Data2 = DataBA_2[:, 2]
         # passing fibres
         Data4 = DataBA_4[:, 2]
-        # dbs-all
+        # dbs-comb
         Data5 = DataBA_5[:, 2]
 
         print("\n", "difference dbs-states:")
@@ -1149,7 +1149,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 "dbs-off vs. efferent",
                 "dbs-off vs. afferent",
                 "dbs-off vs. passing fibres",
-                "dbs-off vs. dbs-all",
+                "dbs-off vs. dbs-comb",
             ],
             "S1 t": [],
             "S1 p": [],
@@ -1243,7 +1243,7 @@ def anova_load_simulation(number_of_persons):
         "efferent",
         "afferent",
         "passing-fibres",
-        "dbs-all",
+        "dbs-comb",
     ]
 
     for i in range(1, 6):
@@ -1290,7 +1290,7 @@ def anova_load_simulation_ttest(number_of_persons):
         "efferent",
         "afferent",
         "passing-fibres",
-        "dbs-all",
+        "dbs-comb",
     ]
 
     for i in range(1, 6):
@@ -1512,7 +1512,7 @@ def load_data_previously_selected(
         dbs_state (str):
             "ON" or "OFF"
         dbs_variant (str):
-            "suppression", "efferent" or "dbs-all"
+            "suppression", "efferent" or "dbs-comb"
         switch_choice_manipulation (float | None):
             Fraction of trials for which the choice should be switched.
 
@@ -1547,7 +1547,7 @@ def load_data_previously_selected(
         if dbs_state == "OFF":
             dbs_load = 0
         elif dbs_state == "ON":
-            dbs_load = {"suppression": 1, "efferent": 2, "dbs-all": 5}[dbs_variant]
+            dbs_load = {"suppression": 1, "efferent": 2, "dbs-comb": 5}[dbs_variant]
         file_name = (
             lambda sim_id: f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut_load}_DBS_State{dbs_load}_sim{sim_id}.pkl"
         )
@@ -1632,7 +1632,7 @@ def previously_selected():
     # set for which groups correlation analyses should be done
     subject_type_list = ["patient", "simulation"]
     shortcut_type_list = ["plastic", "fixed"]
-    dbs_variant_list = ["suppression", "efferent", "dbs-all"]
+    dbs_variant_list = ["suppression", "efferent", "dbs-comb"]
     dbs_state_list = ["ON", "OFF"]
     switch_choice_manipulation_list = [None, 0.05, 0.1]
     # get all combinations to get groups
