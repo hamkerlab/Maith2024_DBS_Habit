@@ -9,11 +9,11 @@ import statistic as stat
 __fig_shortcut_on_off_line__ = False
 __fig_shortcut_on_off__ = False
 __fig_dbs_on_off_14_and_100__ = False
-__fig_activity_changes_dbs_on__ = False
+__fig_activity_changes_dbs_on__ = True
 __fig_activity_changes_dbs_off__ = False
 __fig_gpi_scatter__ = False
 __fig_load_simulate__ = False
-__fig_load_simulate_dbsall__ = False
+__fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
 
@@ -1594,11 +1594,11 @@ def load_simulate():
 
 
 #################################################################################################################
-################################### __appendix__fig_load_simulate_dbsall__ ######################################
+################################### __appendix__fig_load_simulate_dbscomb__ ######################################
 #################################################################################################################
 
 
-def load_simulate_dbsall():
+def load_simulate_dbscomb():
 
     # number of simulations
     number_of_simulations = 100
@@ -1770,8 +1770,8 @@ def load_simulate_dbsall():
 
     plt.tight_layout()
 
-    plt.savefig("fig/__fig_load_simulate_dbsall__.png", dpi=300)
-    plt.savefig("fig/__fig_load_simulate_dbsall__.svg", format="svg", dpi=300)
+    plt.savefig("fig/__fig_load_simulate_dbscomb__.png", dpi=300)
+    plt.savefig("fig/__fig_load_simulate_dbscomb__.svg", format="svg", dpi=300)
 
     plt.show()
 
@@ -2241,8 +2241,8 @@ if __fig_gpi_scatter__:
 if __fig_load_simulate__:
     load_simulate()
 
-if __fig_load_simulate_dbsall__:
-    load_simulate_dbsall()
+if __fig_load_simulate_dbscomb__:
+    load_simulate_dbscomb()
 
 if __fig_dbs_parameter__:
     dbs_parameter()

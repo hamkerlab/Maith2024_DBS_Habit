@@ -21,7 +21,7 @@ get_load_simulate_data = False
 ############################################### visualization #####################################################
 ###################################################################################################################
 # plot_figures = True -> create the images from the existing data without starting the simulation
-plot_figures = True
+plot_figures = False
 
 fig_shortcut_on_off_line = True
 fig_shortcut_on_off = True
@@ -30,7 +30,7 @@ fig_activity_changes_dbs_on = True
 fig_activity_changes_dbs_off = True
 fig_gpi_scatter = True
 fig_load_simulate = True
-fig_load_simulate_dbsall = True
+fig_load_simulate_dbscomb = True
 fig_dbs_parameter = True
 fig_parameter_gpi_inhib = True
 
@@ -39,17 +39,17 @@ fig_parameter_gpi_inhib = True
 ################################################### statistic #####################################################
 ###################################################################################################################
 # run_statistic = True -> create statistic data without starting the simulation
-run_statistic = False
+run_statistic = True
 
-check_H1 = True
+check_H1 = False
 check_H2 = True
-check_H3 = True
-anova_load_simulation = True
-pairwise_ttest_load_simulation = True
-previously_selected = True
+check_H3 = False
+anova_load_simulation = False
+pairwise_ttest_load_simulation = False
+previously_selected = False
 
 # Save means and standard errors
-save_mean_and_errors = True
+save_mean_and_errors = False
 
 
 #####################################################################################################
@@ -372,8 +372,8 @@ if plot_figures:
     if fig_load_simulate:
         vis.load_simulate()
 
-    if fig_load_simulate_dbsall:
-        vis.load_simulate_dbsall()
+    if fig_load_simulate_dbscomb:
+        vis.load_simulate_dbscomb()
 
     if fig_dbs_parameter:
         vis.dbs_parameter()
