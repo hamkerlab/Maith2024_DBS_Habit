@@ -1247,8 +1247,8 @@ def estimate_p_explore(data_on, data_off, save_folder, inference):
     with ProcessPoolExecutor() as executor:
         for dbs, data in enumerate([data_off, data_on]):
             for subject_idx, subject in enumerate(data["subject"].unique()):
-                # if subject_idx >= 2:
-                #     break  # TODO remove
+                if N_SUBJECTS is not None and subject_idx >= N_SUBJECTS:
+                    break
                 task = executor.submit(
                     estimate_p_explore_process_subject,
                     subject,
@@ -1297,12 +1297,13 @@ if __name__ == "__main__":
     seed = 123
     tune = 7000
     draws = 15000
-    # tune = 500  # TODO remove
-    # draws = 1000  # TODO remove
+    tune = 500  # TODO remove
+    draws = 1000  # TODO remove
+    N_SUBJECTS = 10  # TODO change to None
     draws_prior = 2000
     target_accept = 0.975
-    plot_patients = True
-    plot_mle_estimates = True
+    plot_patients = False
+    plot_mle_estimates = False
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
     az.style.use("arviz-darkgrid")
@@ -1372,7 +1373,7 @@ if __name__ == "__main__":
 
         # set the number of subjects to use
         n_subjects = len(data_off["subject"].unique())
-        # n_subjects = 2  # TODO remove
+        n_subjects = N_SUBJECTS if N_SUBJECTS is not None else n_subjects
 
         # for plotting priors and posteriors many subplots are created (as many as there
         # are subjects), adjust the max subplots parameter for the number of subjects
