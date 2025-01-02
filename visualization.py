@@ -1700,7 +1700,8 @@ def weights_over_time_boxplots(
     specific_sessions=[3],
 ):
     df = df.copy()
-    # Remove all rows where dbs_state is OFF and dbs_type is not dbs-all
+    # Remove all rows where dbs_state is OFF and dbs_type is not dbs-all (i.e. only
+    # keep OFF for dbs_type dbs-all)
     df = df[~((df["dbs_state"] == "OFF") & (df["dbs_type"] != "dbs-all"))]
 
     # For the rows in which dbs_state is OFF change the dbs_type to OFF
@@ -1947,6 +1948,7 @@ def get_weights_over_time_arrays(n_sims, n_dbs, n_trials):
     # (120, 2, 4)
 
     # get the combined matrices for all time points / trials
+    # the last two dimensions are (post, pre)
     w_direct = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
     w_indirect = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
     w_hyperdirect = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
@@ -1983,6 +1985,8 @@ def get_weights_over_time_arrays(n_sims, n_dbs, n_trials):
     # - average over indizes/neurons:
     #   - w_direct, w_indirect, w_hyperdirect, w_shortcut --> over IT dimension
     #   - w_dopa_predict --> over StrD1 dimension
+    # - after mean the shapes are (n_sims, n_dbs, n_trials, 1, 1) for dopa_predict
+    #   and (n_sims, n_dbs, n_trials, 2, 1) for the others
     w_direct = np.mean(w_direct, axis=4, keepdims=True)  # IT is pre
     w_indirect = np.mean(w_indirect, axis=4, keepdims=True)  # IT is pre
     w_hyperdirect = np.mean(w_hyperdirect, axis=4, keepdims=True)  # IT is pre
@@ -1997,12 +2001,12 @@ def weights_over_time_lineplots(
 ):
     # for plotting weights through time average over sim_ids (the reversal order is the
     # same for all sims)
-    # (6,120,2,1)
+    # shape (n_dbs, n_trials, 2, 1) after averaging over sim_ids
     w_direct = np.mean(w_direct, axis=0)
     w_indirect = np.mean(w_indirect, axis=0)
     w_hyperdirect = np.mean(w_hyperdirect, axis=0)
     w_shortcut = np.mean(w_shortcut, axis=0)
-    # (6,120,1,1)
+    # shape (n_dbs, n_trials, 1, 1) after averaging over sim_ids
     w_dopa_predict = np.mean(w_dopa_predict, axis=0)
 
     arrays = [w_direct, w_indirect, w_hyperdirect, w_shortcut]
@@ -2044,6 +2048,7 @@ def weights_over_time_lineplots(
                 np.array([dbs_state_names[dbs][1] for dbs in range(n_dbs)]), :, :, 0
             ].max(),
         )
+        # loop over columns/post neurons i.e. "channels"
         for column_idx, (ax, title, ylabel) in enumerate(
             zip(row_axes, title_row, ylabel_row)
         ):
