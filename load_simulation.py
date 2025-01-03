@@ -10,6 +10,7 @@ import random
 initial_seed = int(sys.argv[1]) + 17112023  # number of persons (1-14) + date
 # print("\n", initial_seed, "\n")
 random.seed(initial_seed)
+ann_compile_str = f"annarchy_{sys.argv[1]}_{sys.argv[2]}_{sys.argv[7]}"
 
 
 def trial_seed(trial: int):
@@ -177,13 +178,8 @@ def save_data(success, condition):
     df = pd.DataFrame(success)
 
     # filepath
-    filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{dbs}_Condition_{condition}.json"
-    if column == 0:
-        df.to_json(filepath, orient="records", lines=True)
-    else:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[column] = success
-        data.to_json(filepath, orient="records", lines=True)
+    filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{dbs}_Condition_{condition}_sim{column}.json"
+    df.to_json(filepath, orient="records", lines=True)
 
 
 ##############################################################################
@@ -231,7 +227,12 @@ def simulate():
     ########################## compile BG model ##############################
 
     populations = BG.create_network(
-        initial_seed, dbs_state, shortcut, parameter, dbs_param_state
+        initial_seed,
+        dbs_state,
+        shortcut,
+        parameter,
+        dbs_param_state,
+        ann_compile_str=ann_compile_str,
     )
 
     ################## Populationsparameter übergeben ########################

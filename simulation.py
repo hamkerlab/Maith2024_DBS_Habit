@@ -4,12 +4,14 @@ import numpy as np
 import pandas as pd
 import sys
 import random
+from CompNeuroPy import save_variables
 
 
 ############################## fixed random values ##################################
 
 seed = int(sys.argv[1]) + 17112023  # 17112023 = Date
 random.seed(seed)
+ann_compile_str = f"annarchy_{sys.argv[1]}_{sys.argv[2]}_{sys.argv[3]}"
 
 
 ############################### Reset #################################
@@ -142,7 +144,7 @@ def create_reward(anz_trials, p, zufall):
 ####################### save rewards per session ##############################
 
 
-def save_data(success, selected_list, dbs_state, shortcut):
+def save_data(success, selected_list, dbs_state, shortcut, plastic_weights):
     success = [int(x) for x in success]
 
     column = int(sys.argv[1])
@@ -151,15 +153,8 @@ def save_data(success, selected_list, dbs_state, shortcut):
     save_data = sys.argv[6]
     if save_data == "True":
         # filename
-        filepath = (
-            f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-        )
-        if column == 0:
-            df.to_json(filepath, orient="records", lines=True)
-        else:
-            data = pd.read_json(filepath, orient="records", lines=True)
-            data[column] = success
-            data.to_json(filepath, orient="records", lines=True)
+        filepath = f"data/simulation_data/Results_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}.json"
+        df.to_json(filepath, orient="records", lines=True)
 
         # save success and selected_list separately using pickle
         import pickle
@@ -170,7 +165,14 @@ def save_data(success, selected_list, dbs_state, shortcut):
         ) as f:
             pickle.dump({"rewards": success, "choices": selected_list}, f)
 
-        ### TODO this now saves choices and rewards per trial, now run again simulations to generate simulation data
+        # save plastic weights
+        save_variables(
+            variable_list=[plastic_weights],
+            name_list=[
+                f"plastic_weights_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}"
+            ],
+            path="data/simulation_data/",
+        )
 
 
 ###############################################################################
@@ -188,43 +190,32 @@ def save_parameter(success, dbs_state, shortcut, parameter):
     ################################ save data ################################
 
     if dbs_state == 1:
-        filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/1_suppression/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 2:
-        filepath = f"data/parameter_data/2_efferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/2_efferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 3:
-        filepath = f"data/parameter_data/3_afferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/3_afferent/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 4:
-        filepath = f"data/parameter_data/4_passing_fibres/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/parameter_data/4_passing_fibres/Results_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
 
     df = pd.DataFrame(success)
-
-    if column == 0:
-        df.to_json(filepath, orient="records", lines=True)
-    else:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[column] = success
-        data.to_json(filepath, orient="records", lines=True)
+    df.to_json(filepath, orient="records", lines=True)
 
     ##################### save optimal param #####################
 
-    if dbs_state == 1:
-        filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 2:
-        filepath = f"data/parameter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 3:
-        filepath = f"data/parameter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 4:
-        filepath = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+    if column == 0:
+        if dbs_state == 1:
+            filepath = f"data/parameter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 2:
+            filepath = f"data/parameter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 3:
+            filepath = f"data/parameter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 4:
+            filepath = f"data/parameter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
 
-    optimal_data = [parameter]
-    df = pd.DataFrame(optimal_data)
-
-    if column == 0 and step == 0:
+        optimal_data = [parameter]
+        df = pd.DataFrame(optimal_data)
         df.to_json(filepath, orient="records", lines=True)
-    elif column == 0 and step > 0:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[step] = optimal_data
-        data.to_json(filepath, orient="records", lines=True)
 
 
 ###############################################################################
@@ -241,44 +232,33 @@ def save_GPi_r(mean_GPi, dbs_state, shortcut, parameter):
     ####################### save average rate GPi #############################
 
     if dbs_state == 1:
-        filepath = f"data/gpi_scatter_data/1_suppression/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/1_suppression/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 2:
-        filepath = f"data/gpi_scatter_data/2_efferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/2_efferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 3:
-        filepath = f"data/gpi_scatter_data/3_afferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/3_afferent/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
     if dbs_state == 4:
-        filepath = f"data/gpi_scatter_data/4_passing_fibres/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}.json"
+        filepath = f"data/gpi_scatter_data/4_passing_fibres/mean_Shortcut{shortcut}_DBS_State{dbs_state}_Step{step}_sim{column}.json"
 
     mean_GPi = [mean_GPi]
     df = pd.DataFrame(mean_GPi)
-
-    if column == 0:
-        df.to_json(filepath, orient="records", lines=True)
-    else:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[column] = mean_GPi
-        data.to_json(filepath, orient="records", lines=True)
+    df.to_json(filepath, orient="records", lines=True)
 
     ############################ save gpi scatter data #################################
 
-    if dbs_state == 1:
-        filepath = f"data/gpi_scatter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 2:
-        filepath = f"data/gpi_scatter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 3:
-        filepath = f"data/gpi_scatter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
-    if dbs_state == 4:
-        filepath = f"data/gpi_scatter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}.json"
+    if column == 0:
+        if dbs_state == 1:
+            filepath = f"data/gpi_scatter_data/1_suppression/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 2:
+            filepath = f"data/gpi_scatter_data/2_efferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 3:
+            filepath = f"data/gpi_scatter_data/3_afferent/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
+        if dbs_state == 4:
+            filepath = f"data/gpi_scatter_data/4_passing_fibres/Param_Shortcut{shortcut}_DBS_State{dbs_state}_step{step}.json"
 
-    optimal_data = [parameter]
-    df = pd.DataFrame(optimal_data)
-
-    if column == 0 and step == 0:
+        optimal_data = [parameter]
+        df = pd.DataFrame(optimal_data)
         df.to_json(filepath, orient="records", lines=True)
-    elif column == 0 and step > 0:
-        data = pd.read_json(filepath, orient="records", lines=True)
-        data[step] = optimal_data
-        data.to_json(filepath, orient="records", lines=True)
 
 
 ##############################################################################
@@ -287,7 +267,6 @@ def save_GPi_r(mean_GPi, dbs_state, shortcut, parameter):
 
 
 def simulate():
-    id = int(sys.argv[1])
     dbs_state = int(sys.argv[2])
     shortcut = int(sys.argv[3])
     parameter = float(sys.argv[7])
@@ -298,7 +277,12 @@ def simulate():
     ######################### compile BG_Modell ##############################
 
     populations = BG.create_network(
-        seed, dbs_state, shortcut, parameter, dbs_param_state
+        seed,
+        dbs_state,
+        shortcut,
+        parameter,
+        dbs_param_state,
+        ann_compile_str=ann_compile_str,
     )
 
     ####################### get population parameters ########################
@@ -347,6 +331,7 @@ def simulate():
     StrD1_GPi_list = []
     step = np.linspace(0, anz_trials - 1, 5).astype(int)
     reward = create_reward(anz_trials, belohnungsverteilung, zufall)
+    plastic_weights = {}
 
     ############################# initial monitor ###############################
 
@@ -447,7 +432,10 @@ def simulate():
             recordings = monitor.get()
             monitor.stop()
 
-    save_data(success, selected_list, dbs_state, shortcut)
+        # at the end of each trial get the plastic weights
+        plastic_weights = BG.get_plastic_weights(plastic_weights)
+
+    save_data(success, selected_list, dbs_state, shortcut, plastic_weights)
 
     if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
         save_parameter(success, dbs_state, shortcut, parameter)

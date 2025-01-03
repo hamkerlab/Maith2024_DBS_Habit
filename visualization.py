@@ -1,6 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import statistic as stat
+from CompNeuroPy import load_variables
+import pandas as pd
+import seaborn as sns
+import pingouin as pg
+from statannotations.Annotator import Annotator
 
 #################################################################################################################
 ########################################### plot figures ########################################################
@@ -16,6 +21,7 @@ __fig_load_simulate__ = False
 __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
+__fig_weights_over_time__ = True
 
 
 ##############################################################################
@@ -909,7 +915,7 @@ def activity_changes_dbs_on():
             "dbs-comb",
             # "dbs-off",
         ]
-
+  
         label_y = [
             "$\\mathbf{Cor_{in}}$",
             "$\\mathbf{StrD1}$",
@@ -1925,7 +1931,7 @@ def dbs_parameter():
             ax.plot(
                 param,
                 data[j],
-                label=f"Session {j+1}",
+                label=f"Session {j + 1}",
                 linewidth=1,
                 color=line_color[j],
             )
@@ -2217,35 +2223,557 @@ def parameter_gpi_inhib():
 
 
 #################################################################################################################
+################################### __fig_weights_over_time__ ########################################
+#################################################################################################################
+
+
+def get_w_direct(loaded_variables, dbs_state, sim_id, trial):
+    w1 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "ITStrD1"
+        ][trial]
+    )
+    w2 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "StrD1GPi"
+        ][trial]
+    )
+    return np.transpose(np.matmul(w1, w2))
+
+
+def get_w_indirect(loaded_variables, dbs_state, sim_id, trial):
+    w1 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "ITStrD2"
+        ][trial]
+    )
+    w2 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "StrD2GPe"
+        ][trial]
+    )
+    return np.transpose(np.matmul(w1, w2))
+
+
+def get_w_hyperdirect(loaded_variables, dbs_state, sim_id, trial):
+    w1 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "ITSTN"
+        ][trial]
+    )
+    w2 = np.transpose(
+        loaded_variables[f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"][
+            "STNGPi"
+        ][trial]
+    )
+    return np.transpose(np.matmul(w1, w2))
+
+
+def weights_over_time_boxplots(
+    df,
+    specific_dbs_types=["suppression", "efferent", "dbs-all", "OFF"],
+    specific_sessions=[3],
+):
+    df = df.copy()
+    # Remove all rows where dbs_state is OFF and dbs_type is not dbs-all (i.e. only
+    # keep OFF for dbs_type dbs-all)
+    df = df[~((df["dbs_state"] == "OFF") & (df["dbs_type"] != "dbs-all"))]
+
+    # For the rows in which dbs_state is OFF change the dbs_type to OFF
+    df.loc[df["dbs_state"] == "OFF", "dbs_type"] = "OFF"
+
+    # Remove the dbs_state column
+    df = df.drop(columns=["dbs_state"])
+
+    # Define the specific dbs_type values to plot
+    save_string_dbs_types = "".join([s[0] for s in specific_dbs_types])
+
+    # Define the sessions to plot
+    save_string_sessions = "".join([str(s) for s in specific_sessions])
+
+    # Filter the DataFrame to include only the specified dbs_type values
+    df_filtered = df[df["dbs_type"].isin(specific_dbs_types)]
+
+    # Filter the DataFrame to include only the specified sessions
+    df_filtered = df_filtered[df_filtered["session"].isin(specific_sessions)]
+
+    # Create subplots for each weight type
+    weight_types = [
+        "w_direct_0",
+        "w_direct_1",
+        "w_indirect_0",
+        "w_indirect_1",
+        "w_hyperdirect_0",
+        "w_hyperdirect_1",
+        "w_shortcut_0",
+        "w_shortcut_1",
+        "w_dopa_predict",
+    ]
+
+    # Set up the matplotlib figure
+    fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(15, 15))
+    axes = axes.flatten()
+
+    # Create a boxplot for each weight type
+    for i, weight_type in enumerate(weight_types):
+        x = "session" if len(specific_sessions) > 1 else "dbs_type"
+        y = weight_type
+        hue = "dbs_type"
+        hue_order = specific_dbs_types
+        order = specific_sessions if len(specific_sessions) > 1 else specific_dbs_types
+        ax = sns.boxplot(
+            x=x,
+            y=y,
+            hue=hue,
+            palette={
+                "suppression": (1, 0.7, 0.7, 0.8),
+                "efferent": (1, 0.5, 0.5, 0.8),
+                "dbs-all": (0.8, 0, 0, 0.8),
+                "OFF": "darkblue",
+                "passing": "yellow",
+                "afferent": "green",
+            },
+            data=df_filtered,
+            ax=axes[i],
+            showmeans=True,
+            meanprops={
+                "markerfacecolor": "black",
+                "markeredgecolor": "white",
+            },
+            linecolor="black",
+            order=order,
+            hue_order=hue_order,
+        )
+        axes[i].set_title(weight_type)
+        if len(specific_sessions) > 1:
+            axes[i].legend_.remove()  # Remove individual legends
+
+        # make pariwise tests and annotate
+        if len(specific_sessions) == 1:
+            # pairs for statistic comparison
+            pairs = [
+                ("suppression", "OFF"),
+                ("efferent", "OFF"),
+                ("dbs-all", "OFF"),
+            ]
+
+            # make pairwise tests
+            a = Annotator(ax, pairs=pairs)
+            a.configure(test="t-test")
+            a.apply_test()
+            a.annotate()  # TODO find out how annotater works, make two-ways repeated anovas for dbs_state and dbs_type for each weight, e.g. w_direct_0 and than make paired t-tests with pingouin, then annotate p results in boxplot
+
+    if len(specific_sessions) > 1:
+        # Create a single legend outside the subplots
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="upper center", ncol=len(specific_dbs_types))
+
+    # Adjust layout
+    if len(specific_sessions) > 1:
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
+    plt.savefig(
+        f"fig/__fig_weights_boxplots_{save_string_dbs_types}_{save_string_sessions}__.png",
+        dpi=300,
+    )
+    plt.close("all")
+
+
+def get_weights_over_time_data_frame(
+    n_sims, w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict
+):
+    # create a pandas dataframe with columns "w_direct_0", "w_direct_1", "w_indirect_0",
+    # "w_indirect_1", ..., "sim_id", "dbs_type" (suppression, efferent, afferent,
+    # passing, dbs-all), "dbs_state" (ON, OFF), "session" (1,2,3)
+    df = {
+        "w_direct_0": [],
+        "w_direct_1": [],
+        "w_indirect_0": [],
+        "w_indirect_1": [],
+        "w_hyperdirect_0": [],
+        "w_hyperdirect_1": [],
+        "w_shortcut_0": [],
+        "w_shortcut_1": [],
+        "w_dopa_predict": [],
+        "sim_id": [],
+        "dbs_type": [],
+        "dbs_state": [],
+        "session": [],
+    }
+
+    for sim_id in range(n_sims):
+        for dbs_state in ["ON", "OFF"]:
+            for dbs_type in [
+                "suppression",
+                "efferent",
+                "afferent",
+                "passing",
+                "dbs-all",
+            ]:
+                for session in [1, 2, 3]:
+                    if dbs_state == "OFF":
+                        dbs_idx = 0
+                    else:
+                        dbs_idx = {
+                            "suppression": 1,
+                            "efferent": 2,
+                            "afferent": 3,
+                            "passing": 4,
+                            "dbs-all": 5,
+                        }[dbs_type]
+                    # each session has 40 trials
+                    trial_idx_start = (session - 1) * 40
+                    trial_idx_end = session * 40
+                    df["w_direct_0"].append(
+                        np.mean(
+                            w_direct[sim_id, dbs_idx, trial_idx_start:trial_idx_end, 0]
+                        )
+                    )
+                    df["w_direct_1"].append(
+                        np.mean(
+                            w_direct[sim_id, dbs_idx, trial_idx_start:trial_idx_end, 1]
+                        )
+                    )
+                    df["w_indirect_0"].append(
+                        np.mean(
+                            w_indirect[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 0
+                            ]
+                        )
+                    )
+                    df["w_indirect_1"].append(
+                        np.mean(
+                            w_indirect[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 1
+                            ]
+                        )
+                    )
+                    df["w_hyperdirect_0"].append(
+                        np.mean(
+                            w_hyperdirect[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 0
+                            ]
+                        )
+                    )
+                    df["w_hyperdirect_1"].append(
+                        np.mean(
+                            w_hyperdirect[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 1
+                            ]
+                        )
+                    )
+                    df["w_shortcut_0"].append(
+                        np.mean(
+                            w_shortcut[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 0
+                            ]
+                        )
+                    )
+                    df["w_shortcut_1"].append(
+                        np.mean(
+                            w_shortcut[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 1
+                            ]
+                        )
+                    )
+                    df["w_dopa_predict"].append(
+                        np.mean(
+                            w_dopa_predict[
+                                sim_id, dbs_idx, trial_idx_start:trial_idx_end, 0
+                            ]
+                        )
+                    )
+                    df["sim_id"].append(sim_id)
+                    df["dbs_type"].append(dbs_type)
+                    df["dbs_state"].append(dbs_state)
+                    df["session"].append(session)
+
+    return pd.DataFrame(df)
+
+
+def get_weights_over_time_arrays(n_sims, n_dbs, n_trials):
+    # we have weights for each sim (0-99), shortcut (0-fixed,1-plastic), dbs state
+    # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing,5-dbs-all)
+
+    name_list = []
+    for sim_id in range(n_sims):
+        for dbs_state in range(n_dbs):
+            name_list.append(
+                f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
+            )
+    loaded_variables = load_variables(name_list=name_list, path="data/simulation_data/")
+
+    # in each loaded file we have these weight arrays:
+    # ITThal
+    # (120, 2, 2)
+    # ITStrD1
+    # (120, 4, 2)
+    # ITStrD2
+    # (120, 4, 2)
+    # ITSTN
+    # (120, 4, 2)
+    # StrD1SNc
+    # (120, 1, 4)
+    # StrD1GPi
+    # (120, 2, 4)
+    # STNGPi
+    # (120, 2, 4)
+    # StrD2GPe
+    # (120, 2, 4)
+
+    # get the combined matrices for all time points / trials
+    # the last two dimensions are (post, pre)
+    w_direct = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_indirect = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_hyperdirect = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_shortcut = np.zeros((n_sims, n_dbs, n_trials, 2, 2))
+    w_dopa_predict = np.zeros((n_sims, n_dbs, n_trials, 1, 4))
+
+    # - matrix multiply
+    #   - ITStrD1 * StrD1GPi --> w_direct
+    #   - ITStrD2 * StrD2GPe --> w_indirect
+    #   - ITSTN * STNGPi --> w_hyperdirect
+    # - sort others
+    #   - ITThal --> w_shortcut
+    #   - StrD1SNc --> w_dopa_predict
+    for sim_id in range(n_sims):
+        for dbs_state in range(n_dbs):
+            for trial in range(n_trials):
+                w_direct[sim_id, dbs_state, trial] = get_w_direct(
+                    loaded_variables, dbs_state, sim_id, trial
+                )
+                w_indirect[sim_id, dbs_state, trial] = get_w_indirect(
+                    loaded_variables, dbs_state, sim_id, trial
+                )
+                w_hyperdirect[sim_id, dbs_state, trial] = get_w_hyperdirect(
+                    loaded_variables, dbs_state, sim_id, trial
+                )
+                w_shortcut[sim_id, dbs_state, trial] = loaded_variables[
+                    f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
+                ]["ITThal"][trial]
+
+                w_dopa_predict[sim_id, dbs_state, trial] = loaded_variables[
+                    f"plastic_weights_Shortcut1_DBS_State{dbs_state}_sim{sim_id}"
+                ]["StrD1SNc"][trial]
+
+    # - average over indizes/neurons:
+    #   - w_direct, w_indirect, w_hyperdirect, w_shortcut --> over IT dimension
+    #   - w_dopa_predict --> over StrD1 dimension
+    # - after mean the shapes are (n_sims, n_dbs, n_trials, 1, 1) for dopa_predict
+    #   and (n_sims, n_dbs, n_trials, 2, 1) for the others
+    w_direct = np.mean(w_direct, axis=4, keepdims=True)  # IT is pre
+    w_indirect = np.mean(w_indirect, axis=4, keepdims=True)  # IT is pre
+    w_hyperdirect = np.mean(w_hyperdirect, axis=4, keepdims=True)  # IT is pre
+    w_shortcut = np.mean(w_shortcut, axis=4, keepdims=True)  # IT is pre
+    w_dopa_predict = np.mean(w_dopa_predict, axis=4, keepdims=True)  # StrD1 is pre
+
+    return w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict
+
+
+def weights_over_time_lineplots(
+    w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict, n_dbs
+):
+    # for plotting weights through time average over sim_ids (the reversal order is the
+    # same for all sims)
+    # shape (n_dbs, n_trials, 2, 1) after averaging over sim_ids
+    w_direct = np.mean(w_direct, axis=0)
+    w_indirect = np.mean(w_indirect, axis=0)
+    w_hyperdirect = np.mean(w_hyperdirect, axis=0)
+    w_shortcut = np.mean(w_shortcut, axis=0)
+    # shape (n_dbs, n_trials, 1, 1) after averaging over sim_ids
+    w_dopa_predict = np.mean(w_dopa_predict, axis=0)
+
+    arrays = [w_direct, w_indirect, w_hyperdirect, w_shortcut]
+
+    # Subplot titles for each row and column
+    subplot_titles = [
+        ["channel 0", "channel 1"],
+        ["", ""],
+        ["", ""],
+        ["", ""],
+    ]
+    subplot_ylabels = [
+        ["direct", ""],
+        ["indirect", ""],
+        ["hyperdirect", ""],
+        ["shortcut", ""],
+    ]
+    dbs_state_names = [
+        ["DBS-OFF", True],
+        ["suppression", True],
+        ["efferent", True],
+        ["afferent", False],
+        ["passing fibres GPe-STN", False],
+        ["dbs-all", True],
+    ]
+
+    fig, axes = plt.subplots(4, 2, figsize=(12, 8))
+
+    # Plot each array on its respective subplot, splitting by the first dimension
+    for row_idx, (row_axes, title_row, ylabel_row) in enumerate(
+        zip(axes, subplot_titles, subplot_ylabels)
+    ):
+        # get ylim for the row
+        ylim = (
+            arrays[row_idx][
+                np.array([dbs_state_names[dbs][1] for dbs in range(n_dbs)]), :, :, 0
+            ].min(),
+            arrays[row_idx][
+                np.array([dbs_state_names[dbs][1] for dbs in range(n_dbs)]), :, :, 0
+            ].max(),
+        )
+        # loop over columns/post neurons i.e. "channels"
+        for column_idx, (ax, title, ylabel) in enumerate(
+            zip(row_axes, title_row, ylabel_row)
+        ):
+            # set ylim for the column
+            ax.set_ylim(ylim)
+            # activate grid
+            ax.grid(True)
+            # plot data
+            for dbs in range(n_dbs):
+                if dbs_state_names[dbs][1]:
+                    ax.plot(
+                        arrays[row_idx][dbs, :, column_idx, 0],
+                        label=dbs_state_names[dbs][0],
+                    )
+            # Set title and labels
+            if title != "":
+                ax.set_title(title)
+            if ylabel != "":
+                ax.set_ylabel(ylabel)
+            # Setting y-axis tick format to two decimal places
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f"{val:.2f}"))
+            # for last subplot add legend
+            if row_idx * 2 + column_idx == 7:
+                ax.legend()
+
+    # Set common labels and layout
+    # fig.suptitle("Title", fontsize=16)
+    fig.tight_layout(
+        # rect=[0, 0.03, 1, 0.95],
+    )
+
+    plt.savefig("fig/__fig_weights_over_time__.png", dpi=300)
+    plt.close("all")
+
+
+def weights_over_time():
+
+    n_sims = 100
+    n_dbs = 6
+    n_trials = 120
+
+    w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict = (
+        get_weights_over_time_arrays(n_sims, n_dbs, n_trials)
+    )
+
+    df = get_weights_over_time_data_frame(
+        n_sims, w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict
+    )
+
+    # Create boxplots for all dbs types and sessions
+    weights_over_time_boxplots(
+        df,
+        specific_dbs_types=[
+            "suppression",
+            "efferent",
+            "dbs-all",
+            "afferent",
+            "passing",
+            "OFF",
+        ],
+        specific_sessions=[1, 2, 3],
+    )
+    # Only for specific dbs types
+    weights_over_time_boxplots(
+        df,
+        specific_dbs_types=["suppression", "efferent", "dbs-all", "OFF"],
+        specific_sessions=[1, 2, 3],
+    )
+    # Only for session 3
+    weights_over_time_boxplots(
+        df,
+        specific_dbs_types=["suppression", "efferent", "dbs-all", "OFF"],
+        specific_sessions=[3],
+    )
+
+    df = df.copy()
+    specific_dbs_types = ["suppression", "efferent", "dbs-all"]
+    specific_sessions = [3]
+
+    # Filter the DataFrame to include only the specified dbs_type values
+    df_filtered = df[df["dbs_type"].isin(specific_dbs_types)]
+
+    # Filter the DataFrame to include only the specified sessions
+    df_filtered = df_filtered[df_filtered["session"].isin(specific_sessions)]
+
+    # Perform two-way repeated measures ANOVA for each weight variable
+    weight_vars = [
+        "w_direct_0",
+        "w_direct_1",
+        "w_indirect_0",
+        "w_indirect_1",
+        "w_hyperdirect_0",
+        "w_hyperdirect_1",
+        "w_shortcut_0",
+        "w_shortcut_1",
+        "w_dopa_predict",
+    ]
+
+    for weight_var in weight_vars:
+        aov = pg.rm_anova(
+            dv=weight_var,
+            within=["dbs_type", "dbs_state"],
+            subject="sim_id",
+            data=df_filtered,
+            detailed=True,
+        )
+        print(f"ANOVA results for {weight_var}:\n", aov)
+        print("\n")
+
+    # Plot weights over time as lineplots
+    weights_over_time_lineplots(
+        w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict, n_dbs
+    )
+
+
+#################################################################################################################
 ########################################### function call #######################################################
 #################################################################################################################
 
-if __fig_shortcut_on_off_line__:
-    shortcut_on_off_line(14)
 
-if __fig_shortcut_on_off__:
-    shortcut_on_off(True, 14)
+if __name__ == "__main__":
+    if __fig_shortcut_on_off_line__:
+        shortcut_on_off_line(14)
+        
+    if __fig_shortcut_on_off__:
+        shortcut_on_off(True, 14)
 
-if __fig_dbs_on_off_14_and_100__:
-    dbs_on_off_14_and_100(True)
+    if __fig_dbs_on_off_14_and_100__:
+        dbs_on_off_14_and_100(True)
 
-if __fig_activity_changes_dbs_on__:
-    activity_changes_dbs_on()
+    if __fig_activity_changes_dbs_on__:
+        activity_changes_dbs_on()
 
-if __fig_activity_changes_dbs_off__:
-    activity_changes_dbs_off()
+    if __fig_activity_changes_dbs_off__:
+        activity_changes_dbs_off()
 
-if __fig_gpi_scatter__:
-    gpi_scatter()
+    if __fig_gpi_scatter__:
+        gpi_scatter()
 
-if __fig_load_simulate__:
-    load_simulate()
+    if __fig_load_simulate__:
+        load_simulate()
 
-if __fig_load_simulate_dbscomb__:
-    load_simulate_dbscomb()
+    if __fig_dbs_parameter__:
+        dbs_parameter()
+        
+    if __fig_load_simulate_dbscomb__:
+        load_simulate_dbscomb()
 
-if __fig_dbs_parameter__:
-    dbs_parameter()
+    if __fig_parameter_gpi_inhib__:
+        parameter_gpi_inhib()
 
-if __fig_parameter_gpi_inhib__:
-    parameter_gpi_inhib()
+    if __fig_weights_over_time__:
+        weights_over_time()
