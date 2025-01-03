@@ -6,6 +6,8 @@ import pickle
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import statsmodels.api as sm
+from statsmodels.multivariate.manova import MANOVA
 
 #####################################################################################################
 ####################################### ground functions ############################################
@@ -75,6 +77,23 @@ def mean_data(result):
             result[0][1],
             result[0][2],
         ]
+
+    return mean
+
+
+#############################################################################################################
+###################################### calculate averages for 5 trials ######################################
+#############################################################################################################
+
+
+def mean_data_line(result):
+    number_result = len(result)
+
+    if number_result > 1:
+        # mean of 24 colums (axis=0)
+        mean = np.nanmean(result, axis=0)
+    else:
+        mean = result[0]
 
     return mean
 
@@ -260,6 +279,43 @@ def processing_habit_data(data, number_of_persons):
 
         if i == 0:
             result = [habit_sessions]
+        else:
+            result = np.vstack([result, habit_sessions])
+
+    return result
+
+
+#############################################################################################################
+################################# total unrewarded decisions for 5 trials ###################################
+#############################################################################################################
+
+
+def processing_line(data, number_of_persons):
+
+    number_data = len(data[0])
+    if number_data < number_of_persons:
+        number_of_persons = number_data
+
+    result = []
+
+    for i in range(number_of_persons):
+        habit_sessions = []
+
+        # 24 sessions, 5 trials per session
+        for j in range(24):
+            # start- and endindex
+            start_idx = j * 5
+            end_idx = start_idx + 5
+
+            # total 5 trials
+            reward_sum = np.sum(data[start_idx:end_idx, i])
+
+            # unrewarded decitions
+            adjusted_sum = 5 - reward_sum
+            habit_sessions.append(adjusted_sum)
+
+        if i == 0:
+            result = np.array([habit_sessions])
         else:
             result = np.vstack([result, habit_sessions])
 
@@ -481,12 +537,12 @@ def save_mean_error(number_of_persons):
             error_shortoff5[1],
             error_shortoff5[2],
         ],
-        "dbs-all mean": [
+        "dbs-comb mean": [
             mean_shortoff6[0],
             mean_shortoff6[1],
             mean_shortoff6[2],
         ],
-        "dbs-all standard deviation": [
+        "dbs-comb standard deviation": [
             error_shortoff6[0],
             error_shortoff6[1],
             error_shortoff6[2],
@@ -561,12 +617,12 @@ def save_mean_error(number_of_persons):
             error_shorton5[1],
             error_shorton5[2],
         ],
-        "dbs-all mean": [
+        "dbs-comb mean": [
             mean_shorton6[0],
             mean_shorton6[1],
             mean_shorton6[2],
         ],
-        "dbs-all standard deviation": [
+        "dbs-comb standard deviation": [
             error_shorton6[0],
             error_shorton6[1],
             error_shorton6[2],
@@ -684,6 +740,8 @@ def anova_group(*values):
         data_i = [int(x) for x in data_i]
         data.append(np.array(data_i))
 
+    print(data)
+
     ######################################## check sphericity #######################################
 
     normal = True
@@ -706,6 +764,80 @@ def anova_group(*values):
         group = group + groupname
 
     pandas_dataframe = pd.DataFrame({"Value": dataframe, "Group": group})
+
+    # print(pandas_dataframe)
+    print(" ")
+
+    #################################################### ANOVA  ####################################################
+
+    f_statistic = pg.welch_anova(data=pandas_dataframe, dv="Value", between="Group")
+    f_value = f_statistic["F"].values[0]
+    p_value = f_statistic["p-unc"].values[0]
+    df_z = f_statistic["ddof1"].values[0]
+    df_n = f_statistic["ddof2"].values[0]
+
+    # print results
+    print("F(", df_z, ",", df_n, "):", f_value)
+    print("p:", p_value)
+    print("normality:", normal)
+    print("homogeneity of variances:", varhomo)
+
+    # interpret results
+    if p_value < 0.05:
+        difference = 1
+        print(
+            "There is a significant difference between the groups.",
+            "\n",
+        )
+    else:
+        difference = 0
+        print(
+            "There is no significant difference between the groups.",
+            "\n",
+        )
+
+    anova = [f_value, p_value, df_z, df_n, difference, normal, varhomo]
+    return anova
+
+
+def anova_group2(*values):
+    ######################################## processing data #######################################
+
+    data = []
+
+    for i, data_i in enumerate(values):
+        # mask = np.isnan(data_i)
+        # data_i = data_i[~mask]
+        # data_i = [int(x) for x in data_i]
+        data.append(np.array(data_i))
+
+    # print(data)
+
+    ######################################## check sphericity #######################################
+
+    normal = True
+
+    for i, norm_i in enumerate(data):
+        norm = normality(norm_i)
+        if norm == False:
+            normal = False
+
+    varhomo = homo_var(data)
+
+    ################################ prepare pandas dataframe for ANOVA ##############################
+
+    dataframe = np.concatenate(data)
+    group = []
+
+    for i, data_i in enumerate(data):
+        length = len(data_i)
+        groupname = [f"Group{i}" for j in range(length)]
+        group = group + groupname
+
+    pandas_dataframe = pd.DataFrame({"Value": dataframe, "Group": group})
+
+    # print(pandas_dataframe)
+    # print(" ")
 
     #################################################### ANOVA  ####################################################
 
@@ -933,7 +1065,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 "efferent",
                 "afferent",
                 "passing fibres",
-                "dbs-all",
+                "dbs-comb",
             ],
             "S1 t": [],
             "S1 p": [],
@@ -1063,7 +1195,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
         Data2 = DataBA_2[:, 2]
         # passing fibres
         Data4 = DataBA_4[:, 2]
-        # dbs-all
+        # dbs-comb
         Data5 = DataBA_5[:, 2]
 
         print("\n", "difference dbs-states:")
@@ -1095,7 +1227,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 "dbs-off vs. efferent",
                 "dbs-off vs. afferent",
                 "dbs-off vs. passing fibres",
-                "dbs-off vs. dbs-all",
+                "dbs-off vs. dbs-comb",
             ],
             "S1 t": [],
             "S1 p": [],
@@ -1189,7 +1321,7 @@ def anova_load_simulation(number_of_persons):
         "efferent",
         "afferent",
         "passing-fibres",
-        "dbs-all",
+        "dbs-comb",
     ]
 
     for i in range(1, 6):
@@ -1236,7 +1368,7 @@ def anova_load_simulation_ttest(number_of_persons):
         "efferent",
         "afferent",
         "passing-fibres",
-        "dbs-all",
+        "dbs-comb",
     ]
 
     for i in range(1, 6):
@@ -1458,7 +1590,7 @@ def load_data_previously_selected(
         dbs_state (str):
             "ON" or "OFF"
         dbs_variant (str):
-            "suppression", "efferent" or "dbs-all"
+            "suppression", "efferent" or "dbs-comb"
         switch_choice_manipulation (float | None):
             Fraction of trials for which the choice should be switched.
 
@@ -1493,7 +1625,7 @@ def load_data_previously_selected(
         if dbs_state == "OFF":
             dbs_load = 0
         elif dbs_state == "ON":
-            dbs_load = {"suppression": 1, "efferent": 2, "dbs-all": 5}[dbs_variant]
+            dbs_load = {"suppression": 1, "efferent": 2, "dbs-comb": 5}[dbs_variant]
         file_name = (
             lambda sim_id: f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut_load}_DBS_State{dbs_load}_sim{sim_id}.pkl"
         )
@@ -1578,7 +1710,7 @@ def previously_selected():
     # set for which groups correlation analyses should be done
     subject_type_list = ["patient", "simulation"]
     shortcut_type_list = ["plastic", "fixed"]
-    dbs_variant_list = ["suppression", "efferent", "dbs-all"]
+    dbs_variant_list = ["suppression", "efferent", "dbs-comb"]
     dbs_state_list = ["ON", "OFF"]
     switch_choice_manipulation_list = [None, 0.05, 0.1]
     # get all combinations to get groups
@@ -1662,3 +1794,340 @@ def previously_selected():
 
         # get the subject-wise correlations
         # correlations = get_subject_wise_correlations(data_df)
+
+
+#####################################################################################################
+################################### MANOVA change activity ##########################################
+#####################################################################################################
+
+
+def manova_change_activity():
+
+    for session in range(1, 2):
+        # initial
+        number_of_simulations = 100
+        data_dbs1 = []
+        data_dbs2 = []
+        data_dbs3 = []
+        data_dbs4 = []
+        data_dbs5 = []
+        data_dbs6 = []
+
+        ################################################# load data #################################################
+        filepath1 = f"data/activity_change/activity_change_dbs_state0_session{session}"
+        filepath2 = f"data/activity_change/activity_change_dbs_state1_session{session}"
+        filepath3 = f"data/activity_change/activity_change_dbs_state2_session{session}"
+        filepath4 = f"data/activity_change/activity_change_dbs_state3_session{session}"
+        filepath5 = f"data/activity_change/activity_change_dbs_state4_session{session}"
+        filepath6 = f"data/activity_change/activity_change_dbs_state5_session{session}"
+
+        for i in range(number_of_simulations):
+            data_dbs1_load = read_json_data(filepath1 + f"_id{i}.json")
+            data_dbs2_load = read_json_data(filepath2 + f"_id{i}.json")
+            data_dbs3_load = read_json_data(filepath3 + f"_id{i}.json")
+            data_dbs4_load = read_json_data(filepath4 + f"_id{i}.json")
+            data_dbs5_load = read_json_data(filepath5 + f"_id{i}.json")
+            data_dbs6_load = read_json_data(filepath6 + f"_id{i}.json")
+
+            # append loaded data to list
+            data_dbs1.append(data_dbs1_load)
+            data_dbs2.append(data_dbs2_load)
+            data_dbs3.append(data_dbs3_load)
+            data_dbs4.append(data_dbs4_load)
+            data_dbs5.append(data_dbs5_load)
+            data_dbs6.append(data_dbs6_load)
+
+        # concatenate data
+        data_dbs1 = np.array(data_dbs1).T
+        data_dbs2 = np.array(data_dbs2).T
+        data_dbs3 = np.array(data_dbs3).T
+        data_dbs4 = np.array(data_dbs4).T
+        data_dbs5 = np.array(data_dbs5).T
+        data_dbs6 = np.array(data_dbs6).T
+
+        ####################################### Table mean/error #############################################
+
+        # means
+        table_mean_dbs1 = []
+        table_mean_dbs2 = []
+        table_mean_dbs3 = []
+        table_mean_dbs4 = []
+        table_mean_dbs5 = []
+        table_mean_dbs6 = []
+
+        for i in range(len(data_dbs1)):
+            table_mean_dbs1.append(np.mean(data_dbs1[i]))
+            table_mean_dbs2.append(np.mean(data_dbs2[i]))
+            table_mean_dbs3.append(np.mean(data_dbs3[i]))
+            table_mean_dbs4.append(np.mean(data_dbs4[i]))
+            table_mean_dbs5.append(np.mean(data_dbs5[i]))
+            table_mean_dbs6.append(np.mean(data_dbs6[i]))
+
+        table_mean_dbsoff = [
+            np.array(table_mean_dbs1[3:]),
+            np.array(table_mean_dbs1[3:]),
+            np.array(table_mean_dbs1[3:]),
+            np.array(table_mean_dbs1[3:]),
+            np.array(table_mean_dbs1[3:]),
+        ]
+
+        table_mean_dbson = [
+            np.array(table_mean_dbs2[3:]),
+            np.array(table_mean_dbs3[3:]),
+            np.array(table_mean_dbs4[3:]),
+            np.array(table_mean_dbs5[3:]),
+            np.array(table_mean_dbs6[3:]),
+        ]
+
+        # Faktoren definieren
+        states = ["DBS-OFF", "DBS-ON"]
+        conditions = [
+            "supression",
+            "efferent",
+            "afferent",
+            "passing-fibres",
+            "dbs-comb",
+        ]
+        populations = ["STN", "GPi", "GPe", "Thalamus", "Cor_dec", "StrThal"]
+
+        # Testwerte generieren
+        data = []
+        for state in states:
+            for idx, condition in enumerate(conditions):
+                if state == "DBS-OFF":
+                    values = table_mean_dbsoff[idx]
+                else:
+                    values = table_mean_dbson[idx]
+                print(values)
+                data.append([state, condition] + list(values))
+
+        # DataFrame erstellen
+        columns = ["State", "Condition"] + populations
+        df = pd.DataFrame(data, columns=columns)
+
+        filename = "statistic/manova"
+        save_table(df, filename)
+
+        # Überblick über die Daten
+        print("Beispieldaten:")
+        print(df)
+
+        # MANOVA durchführen
+        # Zunächst werden die abhängigen Variablen (Populationsdaten) ausgewählt
+        dependent_vars = "+".join(populations)
+
+        # Formel für die MANOVA
+        formula = f"{dependent_vars} ~ State * Condition"
+
+        # MANOVA-Modell erstellen
+        manova = MANOVA.from_formula(formula, data=df)
+
+        # Ergebnisse anzeigen
+        print("\nMANOVA Ergebnisse:")
+        print(manova.mv_test())
+
+
+def anova_change_activity():
+
+    for session in range(1, 2):
+        # initial
+        number_of_simulations = 100
+        data_dbs1 = []
+        data_dbs2 = []
+        data_dbs3 = []
+        data_dbs4 = []
+        data_dbs5 = []
+        data_dbs6 = []
+
+        ################################################# load data #################################################
+        filepath1 = f"data/activity_change/activity_change_dbs_state0_session{session}"
+        filepath2 = f"data/activity_change/activity_change_dbs_state1_session{session}"
+        filepath3 = f"data/activity_change/activity_change_dbs_state2_session{session}"
+        filepath4 = f"data/activity_change/activity_change_dbs_state3_session{session}"
+        filepath5 = f"data/activity_change/activity_change_dbs_state4_session{session}"
+        filepath6 = f"data/activity_change/activity_change_dbs_state5_session{session}"
+
+        for i in range(number_of_simulations):
+            data_dbs1_load = read_json_data(filepath1 + f"_id{i}.json")
+            data_dbs2_load = read_json_data(filepath2 + f"_id{i}.json")
+            data_dbs3_load = read_json_data(filepath3 + f"_id{i}.json")
+            data_dbs4_load = read_json_data(filepath4 + f"_id{i}.json")
+            data_dbs5_load = read_json_data(filepath5 + f"_id{i}.json")
+            data_dbs6_load = read_json_data(filepath6 + f"_id{i}.json")
+
+            # append loaded data to list
+            data_dbs1.append(data_dbs1_load)
+            data_dbs2.append(data_dbs2_load)
+            data_dbs3.append(data_dbs3_load)
+            data_dbs4.append(data_dbs4_load)
+            data_dbs5.append(data_dbs5_load)
+            data_dbs6.append(data_dbs6_load)
+
+        # concatenate data
+        data_dbs1 = np.array(data_dbs1).T
+        data_dbs2 = np.array(data_dbs2).T
+        data_dbs3 = np.array(data_dbs3).T
+        data_dbs4 = np.array(data_dbs4).T
+        data_dbs5 = np.array(data_dbs5).T
+        data_dbs6 = np.array(data_dbs6).T
+
+        ####################################### Table mean/error #############################################
+
+        # means
+        table_mean_dbs1 = []
+        table_mean_dbs2 = []
+        table_mean_dbs3 = []
+        table_mean_dbs4 = []
+        table_mean_dbs5 = []
+        table_mean_dbs6 = []
+
+        #        for i in range(len(data_dbs1)):
+        #            table_mean_dbs1.append(np.mean(data_dbs1[i]))
+        #            table_mean_dbs2.append(np.mean(data_dbs2[i]))
+        #            table_mean_dbs3.append(np.mean(data_dbs3[i]))
+        #            table_mean_dbs4.append(np.mean(data_dbs4[i]))
+        #            table_mean_dbs5.append(np.mean(data_dbs5[i]))
+        #            table_mean_dbs6.append(np.mean(data_dbs6[i]))
+
+        for i in range(len(data_dbs1)):
+            table_mean_dbs1.append(data_dbs1[i])
+            table_mean_dbs2.append(data_dbs2[i])
+            table_mean_dbs3.append(data_dbs3[i])
+            table_mean_dbs4.append(data_dbs4[i])
+            table_mean_dbs5.append(data_dbs5[i])
+            table_mean_dbs6.append(data_dbs6[i])
+
+    # table_mean_dbs1 = table_mean_dbs1[3:]
+    # table_mean_dbs2 = table_mean_dbs2[3:]
+    # table_mean_dbs3 = table_mean_dbs3[3:]
+    # table_mean_dbs4 = table_mean_dbs4[3:]
+    # table_mean_dbs5 = table_mean_dbs5[3:]
+    # table_mean_dbs6 = table_mean_dbs6[3:]
+
+    table_mean_dbs1 = np.array(table_mean_dbs1)
+    table_mean_dbs2 = np.array(table_mean_dbs2)
+    table_mean_dbs3 = np.array(table_mean_dbs3)
+    table_mean_dbs4 = np.array(table_mean_dbs4)
+    table_mean_dbs5 = np.array(table_mean_dbs5)
+    table_mean_dbs6 = np.array(table_mean_dbs6)
+
+    table_mean_dbs1 = [sublist[0] for sublist in table_mean_dbs1]
+    table_mean_dbs2 = [sublist[0] for sublist in table_mean_dbs2]
+    table_mean_dbs3 = [sublist[0] for sublist in table_mean_dbs3]
+    table_mean_dbs4 = [sublist[0] for sublist in table_mean_dbs4]
+    table_mean_dbs5 = [sublist[0] for sublist in table_mean_dbs5]
+    table_mean_dbs6 = [sublist[0] for sublist in table_mean_dbs6]
+
+    table_mean_dbs1 = np.array(table_mean_dbs1)
+    table_mean_dbs2 = np.array(table_mean_dbs2)
+    table_mean_dbs3 = np.array(table_mean_dbs3)
+    table_mean_dbs4 = np.array(table_mean_dbs4)
+    table_mean_dbs5 = np.array(table_mean_dbs5)
+    table_mean_dbs6 = np.array(table_mean_dbs6)
+
+    conditions = {
+        "dbs-off": table_mean_dbs1,
+        "supression": table_mean_dbs2,
+        "efferent": table_mean_dbs3,
+        "afferent": table_mean_dbs4,
+        "passing-fibres": table_mean_dbs5,
+        "dbs-comb": table_mean_dbs6,
+    }
+
+    populations = [
+        "Cor_in",
+        "StrD1",
+        "StrD2",
+        "STN",
+        "GPi",
+        "GPe",
+        "Thalamus",
+        "Cor_dec",
+        "StrThal",
+    ]
+
+    # Schritt 1: Daten für MANOVA vorbereiten
+    manova_data = []
+    for condition, values in conditions.items():
+        manova_data.append(
+            {
+                "Condition": condition,
+                # "State": condition,
+                **dict(zip(populations, values)),
+            }
+        )
+
+    df = pd.DataFrame(manova_data)
+
+    # print(df["STN"][5])
+    # print(df["STN"][4])
+    filename = "statistic/manova"
+    save_table(df, filename)
+
+    """
+    formula = " + ".join(populations)
+    manova = MANOVA.from_formula(f"{formula} ~ Condition", data=df)
+    mv_test = manova.mv_test()
+
+    print(f"MANOVA:")
+    print(mv_test)
+    print()
+    """
+
+    # ANOVA für jede Variable durchführen
+    anova_results = {}
+
+    for pop in populations:
+        # Durchführung der ANOVA mit Pingouin
+        print(f"Ergebnis für {pop}:")
+
+        anova = anova_group2(
+            df[pop][0],
+            df[pop][1],
+            df[pop][2],
+            df[pop][3],
+            df[pop][4],
+            df[pop][5],
+        )
+        # print(df[pop][0])
+        # print(df[pop][1])
+        # print(df[pop][2])
+        # print(df[pop][3])
+        # print(df[pop][4])
+        # print(df[pop][5])
+
+        print(anova)
+
+    # Speichern der Ergebnisse
+    # anova_results[pop] = anova[["Source", "F", "p-unc"]]
+
+    # Ergebnisse anzeigen
+    # anova_results_df = pd.concat(anova_results, axis=1)
+    # print(anova_results_df)
+
+    """
+   
+    # Schritt 3: Wenn MANOVA signifikant, ANOVA pro Population durchführen
+    wilks_lambda = mv_test.results["State"]["stat"].loc["Wilks' lambda"]
+    p_value = mv_test.results["State"]["stat"].loc["Pr > F"]
+    if p_value < 0.05:  # Signifikanzschwelle
+        print(
+            f"Signifikante Unterschiede für {condition}. Durchführung von ANOVA pro Population:"
+        )
+        for pop in populations:
+            # Vorbereitung der Daten für ANOVA
+            anova_data = pd.DataFrame(
+                {"Value": subset[pop], "State": subset["State"]}
+            )
+            # ANOVA mit Pingouin
+            anova = pg.anova(dv="Value", between="State", data=anova_data)
+            print(f"ANOVA für Population {pop}:")
+            print(anova)
+            print()
+    """
+
+
+# Funktion aufrufen
+# manova_change_activity()
+anova_change_activity()
+# anova_load_simulation(100)

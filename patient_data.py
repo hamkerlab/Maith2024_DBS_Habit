@@ -18,7 +18,64 @@ class Data:
         self._data_dict = {}
 
     #############################################################################################################
-    ############################### Anzahl abgeschlossener Versuche pro Sitzung laden ###########################
+    ############################### loading outcome data from 14 patients ########################################
+    #############################################################################################################
+
+    def load_outcome(self, sub_id=0, data_folder=None):
+
+        for dbs in range(2):
+
+            Result = []  # Initialize Result as a list
+
+            if dbs == 0:
+                dbs_mode = "ON"
+            else:
+                dbs_mode = "OFF"
+
+            for sub_id in range(19):
+
+                print(dbs_mode)
+
+                # exclude persons with fault data
+                # if sub_id == 4:
+                # continue
+                if sub_id == 7:
+                    continue
+                if sub_id == 10:
+                    continue
+                if sub_id == 11:
+                    continue
+                if sub_id == 13:
+                    continue
+                if sub_id == 15:
+                    continue
+
+                # set path for dataset
+                file_name_results = f"P{sub_id}_RESULTS_DBS_{dbs_mode}.mat"
+
+                # try to load data
+                try:
+                    data_sum_results = sio.loadmat(data_folder + file_name_results)
+                except FileNotFoundError:
+                    print(f"Could not load data from {file_name_results}")
+                    return None
+
+                # ectract outcome-data in array
+                outcome = np.asarray(data_sum_results["outcome"]).squeeze()
+                Result.append(outcome)
+
+            # convert result in DataFrame
+            df = pd.DataFrame(Result)
+
+            # transpone DataFrame in format 19x120
+            df = df.transpose()
+
+            # save data as JSON-file
+            filepath = f"data/patient_data/RewardsPerSession_{dbs_mode}_line.json"
+            df.to_json(filepath, orient="records", lines=True)
+
+    #############################################################################################################
+    ############################### Load number of completed attempts per session ###############################
     #############################################################################################################
 
     def load_completed_tasks(
@@ -33,51 +90,49 @@ class Data:
         if f"{data_folder}_{sub_id}_{dbs_mode}" in self._data_dict:
             return self._data_dict[f"{data_folder}_{sub_id}_{dbs_mode}"]
 
-        # Dateiname der geladen werden soll
+        # filename
         file_name_results = f"P{sub_id}RT_DBS_{dbs_mode}.mat"
 
-        # Dateipfad der geladen werden soll
+        # filepath
         try:
             data_results = sio.loadmat(data_folder + file_name_results)
         except FileNotFoundError:
             print(f"Could not load data from {file_name_results}")
             return None
 
-        # Daten zurückgeben als Dictionary
+        # return data as a dictionary
         self._data_dict[f"{data_folder}_{sub_id}_{dbs_mode}"] = data_results
 
         return data_results
 
     #############################################################################################################
-    ############################# Summe abgeschlossener Versuche pro Sitzung berechnen ##########################
+    ######################## calculate the total number of completed attempts per session #######################
     #############################################################################################################
 
     def sum_completed_tasks(self, data_results, do_print=False):
 
-        # Array mit Daten für Sitzung 1 erstellen (Wert = Versuch abgeschlossen , Nan = Versuch nicht beendet)
+        # array with data session1
         RT1 = np.array(data_results["RT1"])
         RT1 = np.isnan(RT1)
-        RT1 = np.count_nonzero(
-            ~RT1
-        )  # Anzahl der abgeschlossenen Versuche in Sitzung 1 zählen
+        RT1 = np.count_nonzero(~RT1)  # count completed tasks
         if RT1 < 20.0:
             RT1 = 0
 
-        # Array mit Daten für Sitzung 2 erstellen
+        # array with data session2
         RT2 = np.array(data_results["RT2"])
         RT2 = np.isnan(RT2)
         RT2 = np.count_nonzero(~RT2)
         if RT2 < 20.0:
             RT2 = 0
 
-        # Array mit Daten für Sitzung 3 erstellen
+        # array with data session3
         RT3 = np.array(data_results["RT3"])
         RT3 = np.isnan(RT3)
         RT3 = np.count_nonzero(~RT3)
         if RT3 < 20.0:
             RT3 = 0
 
-        # Array mit Anzahl abgeschlossener Versuche pro Sitzung zurückgeben
+        # return array with number of completed tasks per session
         return np.array(
             [
                 RT1,
@@ -87,38 +142,38 @@ class Data:
         )
 
     #############################################################################################################
-    ####################### Summe abgeschlossener Versuche pro Sitzung ausgeben und speichern ###################
+    ##################### display and save the total number of completed tasks per session ###################
     #############################################################################################################
 
     def save_sum_completed_tasks(self):
 
         data_anz_tasks = np.full((self.nr_subjects, 2, 3), 0)
 
-        # Schleife für alle 19 Probanden und DBS-ON/OFF Zustand
+        # Loop through all 19 subjects and DBS-ON/OFF states
         for sub_id in range(self.nr_subjects - 1):
             for dbs_mode_idx, dbs_mode in enumerate(["ON", "OFF"]):
 
-                # Daten laden in denen steht, ob ein Versuch abgeschlossen oder nicht beendet wurde
+                # Load data indicating whether a trial was completed or not finished
                 data_results = self.load_completed_tasks(
                     sub_id=sub_id, dbs_mode=dbs_mode
                 )
 
-                # falls laden schief geht, wird mit nächster Person/ nächstem Zustand weiter gemacht
+                # If loading fails, proceed with the next subject/state
                 if data_results is None:
                     continue
 
-                # Funktion zum summieren der abgeschlossenen Versuche Pro Sitzung
+                # Function to sum up the completed trials per session
                 data_anz_tasks[sub_id, dbs_mode_idx] = self.sum_completed_tasks(
                     data_results
                 )
                 data_anz_tasks[18, :] = (
-                    40.0  # in Studiendaten fehlt bei P18 RT1,RT2 und RT3 -> manuell ausgelesen
+                    40.0  # In study data, RT1, RT2, and RT3 are missing for Subject 18 -> manually extracted
                 )
 
         DataON = data_anz_tasks[:, 0]
         DataOFF = data_anz_tasks[:, 1]
 
-        ###################### Array mit Anzahl abgeschlossener Versuche pro Sitzung ausgeben ###################
+        ###################### Output array with the number of completed trials per session ###################
 
         print("DBS ON")
         print(DataON)
@@ -127,14 +182,14 @@ class Data:
         print(DataOFF)
         print("")
 
-        ########## Array mit Anzahl abgeschlossener Versuche pro Sitzung in Excel Datei speichern ###############
+        ########## Save array with the number of completed trials per session to an Excel file ###############
 
-        ## save data ON
+        ## Save data ON
         df = pd.DataFrame(data_anz_tasks[:, 0])
         filepath = "data/patient_data/Anz_CompleteTasks_ON.json"
         df.to_json(filepath, orient="records", lines=True)
 
-        ## save data OFF
+        ## Save data OFF
         df = pd.DataFrame(data_anz_tasks[:, 1])
         filepath = "data/patient_data/Anz_CompleteTasks_OFF.json"
         df.to_json(filepath, orient="records", lines=True)
@@ -271,7 +326,7 @@ class Data:
 
         ################################### print rewards per session ###################################
 
-        ### print Daten
+        ### print data
         print("DBS ON")
         print(DataON)
         print("")
@@ -337,6 +392,7 @@ if __name__ == "__main__":
     nr_subjects = 19
     data = Data(data_folder=data_folder, nr_subjects=nr_subjects)
 
+    data.load_outcome(sub_id=0, data_folder=data_folder)
     data.save_sum_completed_tasks()
     data.save_sum_rewards()
     data.choices_rewards_per_trial()

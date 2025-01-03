@@ -132,18 +132,6 @@ def create_network(
         description="Synaptic plasticity based on covariance, with an additional regularization term.",
     )
 
-    ########################### lateral synapse (GPi) ###############################
-    # GPiGPi
-    ReversedSynapse = Synapse(
-        parameters="""
-        """,
-        psp="""
-            w * pos(1.0 - pre.r)
-        """,
-        name="Reversed Synapse",
-        description="Higher pre-synaptic activity lowers the synaptic transmission and vice versa.",
-    )
-
     ############################## striatal synapse ##################################
     # ITStrD1, ITStrD2, ITSTN
     DAPostCovarianceNoThreshold = Synapse(
@@ -526,7 +514,7 @@ def create_network(
         weights=params["StrThalStrThal.connect_all_to_all"]
     )
 
-    GPiGPi = Projection(pre=GPi, post=GPi, target="exc", synapse=ReversedSynapse)
+    GPiGPi = Projection(pre=GPi, post=GPi, target="inh", synapse=StandardSynapse)
     GPiGPi.connect_all_to_all(weights=params["GPiGPi.connect_all_to_all"])
 
     ########################### Thalamus Feedback ################################
@@ -619,7 +607,7 @@ def create_network(
                 auto_implement=True,
             )
 
-        # dbs_state = 5 -> dbs-all
+        # dbs_state = 5 -> dbs-comb
         if dbs_state == 5:
             dbs = DBSstimulator(
                 stimulated_population=GPi,
@@ -707,7 +695,7 @@ def create_network(
                 auto_implement=True,
             )
 
-        # dbs_state = 5 -> dbs-all
+        # dbs_state = 5 -> dbs-comb
         if dbs_state == 5:
             dbs = DBSstimulator(
                 stimulated_population=GPi,

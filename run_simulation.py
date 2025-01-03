@@ -35,12 +35,14 @@ get_load_simulate_data = False if len(sys.argv) < 3 else (MODE == 3)
 # plot_figures = True -> create the images from the existing data without starting the simulation
 plot_figures = False if len(sys.argv) < 3 else (MODE == 5)
 
+fig_shortcut_on_off_line = True
 fig_shortcut_on_off = True
 fig_dbs_on_off_14_100 = True
 fig_activity_changes_dbs_on = True
 fig_activity_changes_dbs_off = True
 fig_gpi_scatter = True
 fig_load_simulate = True
+fig_load_simulate_dbscomb = True
 fig_dbs_parameter = True
 fig_parameter_gpi_inhib = True
 fig_weights_over_time = True
@@ -60,7 +62,7 @@ pairwise_ttest_load_simulation = True
 previously_selected = False
 
 # Save means and standard errors
-save_mean_and_errors = True
+save_mean_and_errors = False
 
 
 #####################################################################################################
@@ -576,8 +578,12 @@ if (
 #####################################################################################################
 
 if plot_figures:
+
     if fig_shortcut_on_off:
         vis.shortcut_on_off(True, 14)
+
+    if fig_shortcut_on_off_line:
+        vis.shortcut_on_off_line(14)
 
     if fig_dbs_on_off_14_100:
         vis.dbs_on_off_14_and_100(True)
@@ -593,6 +599,9 @@ if plot_figures:
 
     if fig_load_simulate:
         vis.load_simulate()
+
+    if fig_load_simulate_dbscomb:
+        vis.load_simulate_dbscomb()
 
     if fig_dbs_parameter:
         vis.dbs_parameter()
