@@ -1603,6 +1603,9 @@ if __name__ == "__main__":
             )
 
     elif sys.argv[1] == "analyze_explore":
+        # empty dataframe to store the p explore data
+        p_explore_data_all = None
+
         for inference in ["double", "suppression", "efferent", "dbs-all"]:
             # load the p explore data
             p_explore_data = pd.read_json(
@@ -1610,6 +1613,26 @@ if __name__ == "__main__":
                 orient="records",
                 lines=True,
             )
+
+            # add new column inference to the p explore data
+            p_explore_data["inference"] = inference
+
+            # add the p explore data to the dataframe
+            if p_explore_data_all is None:
+                p_explore_data_all = p_explore_data
+            else:
+                p_explore_data_all = pd.concat(
+                    [p_explore_data_all, p_explore_data], ignore_index=True
+                )
+
+        # loop over inference types and create boxplots over sessions and ANOVAs with
+        # factors dbs and session
+        for inference in ["double", "suppression", "efferent", "dbs-all"]:
+
+            # filter p_explore_data to only include the current inference type
+            p_explore_data = p_explore_data_all[
+                p_explore_data_all["inference"] == inference
+            ]
 
             # plot the p explore data as boxplots with factors dbs and session using seaborn
             az.style.use("default")
@@ -1635,7 +1658,7 @@ if __name__ == "__main__":
             plt.ylabel("P(Explore)")
             plt.legend(title="DBS State", loc="upper left")
             plt.tight_layout()
-            plt.savefig(f"{save_folder}/p_explore_boxplot_{inference}.png")
+            plt.savefig(f"{save_folder}/p_explore_boxplot_inference_{inference}.png")
             plt.close()
 
             # Perform a two-way repeated measures ANOVA using pingouin
@@ -1646,7 +1669,66 @@ if __name__ == "__main__":
                 data=p_explore_data,
                 detailed=True,
             )
-            print(aov)
 
             # Save the ANOVA results to a CSV file
-            aov.to_csv(f"{save_folder}/p_explore_anova_{inference}.csv", index=False)
+            aov.to_csv(
+                f"{save_folder}/p_explore_anova_inference_{inference}.csv", index=False
+            )
+
+        # loop over sessions and create boxplots over inference types and ANOVAs with
+        # factors dbs and inference type
+        for session in [1, 2, 3]:
+
+            # filter p_explore_data to only include the current session
+            p_explore_data = p_explore_data_all[
+                p_explore_data_all["session"] == session
+            ]
+
+            # plot the p explore data as boxplots with factors dbs and inference using seaborn
+            az.style.use("default")
+            plt.figure(figsize=(10, 6))
+            sns.boxplot(
+                x="inference",
+                y="p_explore",
+                hue="dbs",
+                data=p_explore_data,
+                palette={"ON": "red", "OFF": "blue"},
+                showmeans=True,
+                meanprops={
+                    # "marker": "o",
+                    "markerfacecolor": "black",
+                    "markeredgecolor": "white",
+                    # "markersize": 8,
+                },
+                linecolor="black",
+            )
+
+            plt.title(f"P(Explore) Session {session}")
+            plt.xlabel("Inference Type")
+            plt.ylabel("P(Explore)")
+            plt.legend(title="DBS State", loc="upper left")
+            plt.tight_layout()
+            plt.savefig(f"{save_folder}/p_explore_boxplot_session_{session}.png")
+            plt.close()
+
+            # pingouin needs different subject ids for different between groups
+            for inference_id, inference in enumerate(
+                ["double", "suppression", "efferent", "dbs-all"]
+            ):
+                p_explore_data.loc[
+                    p_explore_data["inference"] == inference, "subject"
+                ] += (inference_id * 200)
+
+            # Perform a two-way mixed measures ANOVA using pingouin
+            aov = pg.mixed_anova(
+                dv="p_explore",
+                within="dbs",
+                between="inference",
+                subject="subject",
+                data=p_explore_data,
+            )
+
+            # Save the ANOVA results to a CSV file
+            aov.to_csv(
+                f"{save_folder}/p_explore_anova_session_{session}.csv", index=False
+            )
