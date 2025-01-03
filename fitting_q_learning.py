@@ -1295,11 +1295,11 @@ if __name__ == "__main__":
 
     save_folder = f"results_fitting_q_learning_complete/{sys.argv[1]}"
     seed = 123
-    tune = 7000
-    draws = 15000
-    tune = 500  # TODO remove
-    draws = 1000  # TODO remove
-    N_SUBJECTS = 10  # TODO change to None
+    tune = 2000  # 7000 in patients study
+    draws = 4000  # 15000 in patients study
+    # tune = 500  # TODO remove
+    # draws = 1000  # TODO remove
+    N_SUBJECTS = 14  # TODO change to None
     draws_prior = 2000
     target_accept = 0.975
     plot_patients = False
