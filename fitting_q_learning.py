@@ -1737,7 +1737,7 @@ if __name__ == "__main__":
         # analyze for dbs variant (suppression, efferent, dbs-all) the p explore data
         # has the highest similarity to the patient data (double)
 
-        # for each ineference type create an array  with shape (n_subjects, 3*2)
+        # for each inference type create an array  with shape (n_subjects, 3*2)
         # with the p_explore data for each session and dbs state combination
         p_explore_arr_dict = {}
         for inference in ["double", "suppression", "efferent", "dbs-all"]:
@@ -1781,14 +1781,14 @@ if __name__ == "__main__":
 
         # PCA for visualization
         pca = PCA(n_components=2)
-        p_explore_arr = np.array(
-            [
-                p_explore_arr_dict[inference]
-                for inference in ["double", "suppression", "efferent", "dbs-all"]
-            ]
-        )
+        p_explore_arr = np.vstack(list(p_explore_arr_dict.values()))
         pca.fit(p_explore_arr)
         p_explore_arr_pca = pca.transform(p_explore_arr)
+
+        # print the details of the pca result
+        print("PCA explained variance ratio:", pca.explained_variance_ratio_)
+        print("PCA components:", pca.components_)
+        print("PCA cooridnates:", p_explore_arr_pca)
 
         # plot the p explore data in a 2D space
         az.style.use("default")
@@ -1801,7 +1801,7 @@ if __name__ == "__main__":
         for inference, (x, y) in zip(
             ["double", "suppression", "efferent", "dbs-all"], p_explore_arr_pca
         ):
-            plt.text(x, y, inference)
+            plt.text(x, y, inference + f" ({round(norms_dict[inference], 2)})")
         plt.xlabel("PC1")
         plt.ylabel("PC2")
         plt.title("P(Explore) Differences")
