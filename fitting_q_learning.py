@@ -26,6 +26,7 @@ import seaborn as sns
 import sys
 from concurrent.futures import ProcessPoolExecutor
 import pingouin as pg
+from sklearn.decomposition import PCA
 
 
 def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
@@ -1732,3 +1733,78 @@ if __name__ == "__main__":
             aov.to_csv(
                 f"{save_folder}/p_explore_anova_session_{session}.csv", index=False
             )
+
+        # analyze for dbs variant (suppression, efferent, dbs-all) the p explore data
+        # has the highest similarity to the patient data (double)
+
+        # for each ineference type create an array  with shape (n_subjects, 3*2)
+        # with the p_explore data for each session and dbs state combination
+        p_explore_arr_dict = {}
+        for inference in ["double", "suppression", "efferent", "dbs-all"]:
+
+            # filter p_explore_data to only include the current inference type
+            p_explore_data = p_explore_data_all[
+                p_explore_data_all["inference"] == inference
+            ]
+            n_subjects = len(p_explore_data["subject"].unique())
+
+            # create an array for the current inference type with shape (n_subjects, 3*2)
+            # with the p_explore data for each session and dbs state combination
+            p_explore_arr = np.zeros((n_subjects, 3 * 2))
+            for session_id, session in enumerate([1, 2, 3]):
+                for dbs in [0, 1]:
+                    for subject_idx, subject in enumerate(
+                        p_explore_data["subject"].unique()
+                    ):
+                        p_explore_arr[subject_idx, session_id * 2 + dbs] = (
+                            p_explore_data[
+                                (p_explore_data["subject"] == subject)
+                                & (p_explore_data["session"] == session)
+                                & (p_explore_data["dbs"] == ["OFF", "ON"][dbs])
+                            ]["p_explore"].values[0]
+                        )
+
+            # average over subjects
+            p_explore_arr = np.nanmean(p_explore_arr, axis=0)
+
+            # add the p explore data to the dictionary
+            p_explore_arr_dict[inference] = p_explore_arr
+
+        # calculate the euclidean distance of the p explore data for each inference type
+        # compared to the p explore data of the double inference type
+        norms_dict = {
+            inference: np.linalg.norm(
+                p_explore_arr_dict[inference] - p_explore_arr_dict["double"]
+            )
+            for inference in p_explore_arr_dict.keys()
+        }
+
+        # PCA for visualization
+        pca = PCA(n_components=2)
+        p_explore_arr = np.array(
+            [
+                p_explore_arr_dict[inference]
+                for inference in ["double", "suppression", "efferent", "dbs-all"]
+            ]
+        )
+        pca.fit(p_explore_arr)
+        p_explore_arr_pca = pca.transform(p_explore_arr)
+
+        # plot the p explore data in a 2D space
+        az.style.use("default")
+        plt.figure(figsize=(10, 6))
+        plt.scatter(
+            p_explore_arr_pca[:, 0],
+            p_explore_arr_pca[:, 1],
+            c=["blue", "green", "red", "purple"],
+        )
+        for inference, (x, y) in zip(
+            ["double", "suppression", "efferent", "dbs-all"], p_explore_arr_pca
+        ):
+            plt.text(x, y, inference)
+        plt.xlabel("PC1")
+        plt.ylabel("PC2")
+        plt.title("P(Explore) Differences")
+        plt.tight_layout()
+        plt.savefig(f"{save_folder}/p_explore_pca.png")
+        plt.close()
