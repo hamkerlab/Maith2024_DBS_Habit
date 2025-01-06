@@ -6,7 +6,7 @@ import pickle
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from statsmodels.multivariate.manova import MANOVA
 
 #####################################################################################################
@@ -263,6 +263,12 @@ def processing_data(data, number_of_persons):
 
 
 def processing_habit_data(data, number_of_persons):
+    """
+    Returns:
+        result (np.array):
+            Array with the number of unrewarded decisions for each session per person
+            with shape (number_of_persons, 3).
+    """
 
     number_data = len(data[0])
     if number_data < number_of_persons:
@@ -1043,6 +1049,130 @@ def pairwise_ttest(*values):
 
 
 #####################################################################################################
+############################################## dbs_on_vs_off ########################################
+#####################################################################################################
+
+
+def dbs_on_vs_off(number_of_persons):
+    """
+    Compare the unrewarded decisions of the different DBS states to the baseline
+    (dbs-off) using a linear mixed effect model. Then compare the different DBS
+    states (excluding afferent and dbs-off) in session 3 using a repeated measures
+    ANOVA.
+    """
+    # Get data in long format with the columns:
+    #   "subject"
+    #   "unrewarded_decisions"
+    #   "dbs_state" (dbs-off, suppression, efferent, afferent, passing fibres, dbs-comb)
+    #   "session" (1, 2, 3)
+    data_dict = {
+        "subject": [],
+        "unrewarded_decisions": [],
+        "dbs_state": [],
+        "session": [],
+    }
+
+    # for each dbs state load data and add it to the dictionary
+    for dbs_state_id, dbs_state_name in [
+        [0, "dbs-off"],
+        [1, "suppression"],
+        [2, "efferent"],
+        [3, "afferent"],
+        [4, "passing fibres"],
+        [5, "dbs-comb"],
+    ]:
+        # load the rewarded decisions data
+        rewarded_decisions_data = read_json_data(
+            f"data/simulation_data/Results_Shortcut1_DBS_State{dbs_state_id}.json"
+        )
+
+        # convert to array with unrewarded decisions per session
+        unrewarded_per_session = processing_habit_data(
+            rewarded_decisions_data, number_of_persons
+        )
+
+        # loop over subjects, here we only use simulation data therefore we have
+        # the same subject ids for each dbs type
+        for subject_id, unrewarded_decisions in enumerate(unrewarded_per_session):
+            # loop over sessions
+            for session_id, unrewarded_decisions_session in enumerate(
+                unrewarded_decisions
+            ):
+                # add data to the dictionary
+                data_dict["subject"].append(subject_id)
+                data_dict["unrewarded_decisions"].append(unrewarded_decisions_session)
+                data_dict["dbs_state"].append(dbs_state_name)
+                data_dict["session"].append(session_id + 1)
+
+    # convert dictionary to pandas dataframe
+    data_df_full = pd.DataFrame(data_dict)
+
+    # run linear mixed effect model for each session
+    # fixed effect for dbs_state compared to baseline (dbs-off)
+    # exclude afferent
+    for session in [1, 2, 3]:
+        data_df = data_df_full.copy()
+        data_df = data_df[data_df["session"] == session]
+        data_df = data_df[data_df["dbs_state"] != "afferent"]
+        data_df["dbs_state"] = data_df["dbs_state"].astype("category")
+        data_df["session"] = data_df["session"].astype("category")
+        model = smf.mixedlm(
+            "unrewarded_decisions ~ C(dbs_state, Treatment('dbs-off'))",
+            data_df,
+            groups=data_df["subject"],
+        )
+        result = model.fit()
+
+        # save results
+        with open(
+            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons}_session_{session}.txt",
+            "w",
+        ) as fh:
+            fh.write(result.summary().as_text())
+
+        # Create a line plot for repeated measures
+        plt.figure(figsize=(8, 6))
+        sns.lineplot(
+            data=data_df,
+            x="dbs_state",
+            y="unrewarded_decisions",
+            hue="subject",
+            marker="o",
+        )
+        plt.title("Performance Across DBS Types for Each Subject")
+        plt.xlabel("Treatment")
+        plt.ylabel("Performance")
+        plt.legend(title="Subject", bbox_to_anchor=(1.05, 1), loc="upper left")
+        plt.tight_layout()
+        plt.savefig(
+            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons}_session_{session}.png"
+        )
+
+    # for session 3 compare the different dbs states (excluding afferent and dbs-off)
+    # using a repeated measures ANOVA using pingouin rm_anova
+    data_df = data_df_full.copy()
+    data_df = data_df[data_df["session"] == 3]
+    data_df = data_df[data_df["dbs_state"] != "afferent"]
+    data_df = data_df[data_df["dbs_state"] != "dbs-off"]
+    data_df["dbs_state"] = data_df["dbs_state"].astype("category")
+    data_df["session"] = data_df["session"].astype("category")
+    aov = pg.rm_anova(
+        data=data_df,
+        dv="unrewarded_decisions",
+        within="dbs_state",
+        subject="subject",
+        detailed=True,
+    )
+
+    # save results
+    with open(
+        f"statistic/simulation_data_difference_dbs_variants_{number_of_persons}_session_3.txt",
+        "w",
+    ) as fh:
+        fh.write(aov.round(3).to_string())
+
+
+#####################################################################################################
 ####################################### check hypothesis ############################################
 #####################################################################################################
 
@@ -1148,69 +1278,10 @@ def run_statistic(H1, H2, H3, number_of_persons):
         )
 
     if H2:
-        table_H2 = {
-            "DBS": [
-                "all dbs-states",
-            ],
-            "S3 F": [],
-            "S3 p": [],
-            "S3 df_z": [],
-            "S3 df_n": [],
-            "S3 diff": [],
-            "S3 norm": [],
-            "S3 var": [],
-        }
-        ########################## load data #############################
+        print("stats H2 with n = ", number_of_persons)
 
-        DataBA_1 = read_json_data(
-            "data/simulation_data/Results_Shortcut1_DBS_State1.json"
-        )
-        DataBA_1 = processing_habit_data(DataBA_1, number_of_persons)
-
-        DataBA_2 = read_json_data(
-            "data/simulation_data/Results_Shortcut1_DBS_State2.json"
-        )
-        DataBA_2 = processing_habit_data(DataBA_2, number_of_persons)
-
-        DataBA_3 = read_json_data(
-            "data/simulation_data/Results_Shortcut1_DBS_State3.json"
-        )
-        DataBA_3 = processing_habit_data(DataBA_3, number_of_persons)
-
-        DataBA_4 = read_json_data(
-            "data/simulation_data/Results_Shortcut1_DBS_State4.json"
-        )
-        DataBA_4 = processing_habit_data(DataBA_4, number_of_persons)
-
-        DataBA_5 = read_json_data(
-            "data/simulation_data/Results_Shortcut1_DBS_State5.json"
-        )
-        DataBA_5 = processing_habit_data(DataBA_5, number_of_persons)
-
-        ########################## ANOVA ###################################
-
-        # suppression
-        Data1 = DataBA_1[:, 2]
-        # efferent
-        Data2 = DataBA_2[:, 2]
-        # passing fibres
-        Data4 = DataBA_4[:, 2]
-        # dbs-comb
-        Data5 = DataBA_5[:, 2]
-
-        print("\n", "difference dbs-states:")
-        anova = anova_group(Data1, Data2, Data4, Data5)
-        table_H2["S3 F"].append(anova[0])
-        table_H2["S3 p"].append(anova[1])
-        table_H2["S3 df_z"].append(anova[2])
-        table_H2["S3 df_n"].append(anova[3])
-        table_H2["S3 diff"].append(anova[4])
-        table_H2["S3 norm"].append(anova[5])
-        table_H2["S3 var"].append(anova[6])
-
-        save_table(
-            table_H2, f"statistic/simulation_data_difference_dbs_on_{number_of_persons}"
-        )
+        # compare dbs on vs off and different dbs types in session 3
+        dbs_on_vs_off(number_of_persons)
 
     if H3:
         dbs_state = [
@@ -2127,7 +2198,8 @@ def anova_change_activity():
     """
 
 
-# Funktion aufrufen
-# manova_change_activity()
-anova_change_activity()
-# anova_load_simulation(100)
+if __name__ == "__main__":
+    # Funktion aufrufen
+    # manova_change_activity()
+    anova_change_activity()
+    # anova_load_simulation(100)
