@@ -61,11 +61,6 @@ anova_load_simulation = True
 pairwise_ttest_load_simulation = True
 previously_selected = False
 
-check_H1 = False  # TODO remove
-check_H3 = False  # TODO remove
-anova_load_simulation = False  # TODO remove
-pairwise_ttest_load_simulation = False  # TODO remove
-
 # Save means and standard errors
 save_mean_and_errors = False
 
