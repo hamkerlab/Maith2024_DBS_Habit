@@ -2176,30 +2176,134 @@ def anova_change_activity():
     # anova_results_df = pd.concat(anova_results, axis=1)
     # print(anova_results_df)
 
-    """
-   
-    # Schritt 3: Wenn MANOVA signifikant, ANOVA pro Population durchführen
-    wilks_lambda = mv_test.results["State"]["stat"].loc["Wilks' lambda"]
-    p_value = mv_test.results["State"]["stat"].loc["Pr > F"]
-    if p_value < 0.05:  # Signifikanzschwelle
-        print(
-            f"Signifikante Unterschiede für {condition}. Durchführung von ANOVA pro Population:"
-        )
-        for pop in populations:
-            # Vorbereitung der Daten für ANOVA
-            anova_data = pd.DataFrame(
-                {"Value": subset[pop], "State": subset["State"]}
-            )
-            # ANOVA mit Pingouin
-            anova = pg.anova(dv="Value", between="State", data=anova_data)
-            print(f"ANOVA für Population {pop}:")
-            print(anova)
-            print()
-    """
 
+#####################################################################################################
+################################### linear regression change activity ###############################
+#####################################################################################################
+
+
+def linear_regression():
+
+    ######################### data ##############################
+
+    number_of_simulations = 100
+    data_dbs1 = []
+    data_dbs2 = []
+    data_dbs3 = []
+    data_dbs4 = []
+    data_dbs5 = []
+    data_dbs6 = []
+
+    ###################### load data ###########################
+
+    filepath1 = "data/activity_change/activity_change_dbs_state0_session1"
+    filepath2 = "data/activity_change/activity_change_dbs_state1_session1"
+    filepath3 = "data/activity_change/activity_change_dbs_state2_session1"
+    filepath4 = "data/activity_change/activity_change_dbs_state3_session1"
+    filepath5 = "data/activity_change/activity_change_dbs_state4_session1"
+    filepath6 = "data/activity_change/activity_change_dbs_state5_session1"
+
+    for i in range(number_of_simulations):
+        data_dbs1_load = read_json_data(filepath1 + f"_id{i}.json")
+        data_dbs2_load = read_json_data(filepath2 + f"_id{i}.json")
+        data_dbs3_load = read_json_data(filepath3 + f"_id{i}.json")
+        data_dbs4_load = read_json_data(filepath4 + f"_id{i}.json")
+        data_dbs5_load = read_json_data(filepath5 + f"_id{i}.json")
+        data_dbs6_load = read_json_data(filepath6 + f"_id{i}.json")
+
+        # append loaded data to list
+        data_dbs1.append(data_dbs1_load[0])
+        data_dbs2.append(data_dbs2_load[0])
+        data_dbs3.append(data_dbs3_load[0])
+        data_dbs4.append(data_dbs4_load[0])
+        data_dbs5.append(data_dbs5_load[0])
+        data_dbs6.append(data_dbs6_load[0])
+
+    # concatenate data
+    data_dbs1 = np.array(data_dbs1).T
+    data_dbs2 = np.array(data_dbs2).T
+    data_dbs3 = np.array(data_dbs3).T
+    data_dbs4 = np.array(data_dbs4).T
+    data_dbs5 = np.array(data_dbs5).T
+    data_dbs6 = np.array(data_dbs6).T
+
+    data_dbs = [data_dbs1, data_dbs2, data_dbs3, data_dbs4, data_dbs5, data_dbs6]
+
+    ######################## Dataframe #########################
+
+    dbs_states = [
+        "dbs-off",
+        "supression",
+        "efferent",
+        "afferent",
+        "passing-fibres",
+        "dbs-comb",
+    ]
+    populations = [
+        "IT",
+        "StrD1",
+        "StrD2",
+        "STN",
+        "GPi",
+        "GPe",
+        "Thal",
+        "PFC",
+        "StrThal",
+    ]
+
+    subject = []
+    dbs_state = []
+    population = []
+    rate_gpi = []
+    messure_id = []
+
+    # lists for dataframe
+    for i, state in enumerate(dbs_states):
+        for j, pop in enumerate(populations):
+            for k in range(len(data_dbs[0][0])):
+                subject.append(i)
+                dbs_state.append(state)
+                population.append(pop)
+                rate_gpi.append(data_dbs[i][j][k])
+                messure_id.append(k)
+
+    # dataframe
+    data_df = pd.DataFrame(
+        {
+            "subject": subject,
+            "dbs_state": dbs_state,
+            "population": population,
+            "rate_gpi": rate_gpi,
+            "messure_id": messure_id,
+        }
+    )
+
+    # save dataframe
+    filename = "statistic/regression"
+    save_table(data_df, filename)
+
+    ##################### statistic mixed-effects model ################
+
+    # fit a mixed-effects model
+    model = smf.mixedlm(
+        "rate_gpi ~ C(dbs_state, Treatment('dbs-off'))",
+        data_df,
+        groups=data_df["subject"],
+    )
+
+    result = model.fit()
+
+    # print summary
+    print(result.summary())
+
+
+#####################################################################################################
+######################################## call test function #########################################
+#####################################################################################################
 
 if __name__ == "__main__":
     # Funktion aufrufen
     # manova_change_activity()
-    anova_change_activity()
+    # anova_change_activity()
     # anova_load_simulation(100)
+    linear_regression()
