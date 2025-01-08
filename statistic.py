@@ -2251,30 +2251,33 @@ def linear_regression():
         "StrThal",
     ]
 
-    subject = []
+    subject_id = []
+    population_id = []
+    messure_id = []
     dbs_state = []
     population = []
     rate_gpi = []
-    messure_id = []
 
     # lists for dataframe
     for i, state in enumerate(dbs_states):
         for j, pop in enumerate(populations):
             for k in range(len(data_dbs[0][0])):
-                subject.append(i)
+                subject_id.append(i)
+                population_id.append(j)
+                messure_id.append(k)
                 dbs_state.append(state)
                 population.append(pop)
                 rate_gpi.append(data_dbs[i][j][k])
-                messure_id.append(k)
 
     # dataframe
     data_df = pd.DataFrame(
         {
-            "subject": subject,
+            "subject_id": subject_id,
+            "population_id": population_id,
+            "messure_id": messure_id,
             "dbs_state": dbs_state,
             "population": population,
             "rate_gpi": rate_gpi,
-            "messure_id": messure_id,
         }
     )
 
@@ -2288,8 +2291,18 @@ def linear_regression():
     model = smf.mixedlm(
         "rate_gpi ~ C(dbs_state, Treatment('dbs-off'))",
         data_df,
-        groups=data_df["subject"],
+        groups=data_df["subject_id"],
     )
+
+    """
+    # fit a mixed-effects model
+    model = smf.mixedlm(
+        "rate_gpi ~ C(dbs_state, Treatment('dbs-off')) * C(population)",
+        data_df,
+        groups=data_df["subject_id"],
+        re_formula="~ C(population)",
+    )
+    """
 
     result = model.fit()
 
