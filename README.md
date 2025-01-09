@@ -103,16 +103,14 @@ All statistical analyses are started in **run_simulation.py** by setting the var
 * GNU/Linux
 
 # Dependencies (given versions used in study)
-For ANNarchy and CompNeuroPy the commits for the source code used for installation are given.
+For ANNarchy the commit for the source code which has to be used for installation is given. The package sympy is installed as dependency from ANNarchy or CompNeuroPy but needs to be downgraded to the given version. We recommend installing ANNarchy and sympy last.
 
 * Python >= 3.10.9
+* CompNeuroPy = 1.0.4
+* openpyxl = 3.1.5
+* pingouin = 0.5.5
+* statannotations = 0.7.1
 * ANNarchy = 4.7.3b ([1c60b7d095389ca521a8ef614624e7d90423f968](https://github.com/ANNarchy/ANNarchy/commit/1c60b7d095389ca521a8ef614624e7d90423f968))
-* CompNeuroPy = 0.1.0 ([7c4f9dcb391e8408cafb340620982414b32a1269](https://github.com/Olimaol/CompNeuroPy/commit/7c4f9dcb391e8408cafb340620982414b32a1269))
-* matplotlib >= 3.7.0
-* numpy >= 1.23.5
-* openpyxl >= 3.1.5
-* pandas >= 1.5.3
-* pingouin >= 0.5.4
-* scipy >= 1.10.0
+* sympy = 1.12.1 (version important!)
 
 Note: In the versions of the packages and code being used, the variable **dbs_depolarization** from CompNeuroPy is incorrectly named and actually represents the variable for the *suppression* DBS variant.
