@@ -28,6 +28,8 @@ from concurrent.futures import ProcessPoolExecutor
 import pingouin as pg
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import cdist
+from statsmodels.multivariate.multivariate_ols import MultivariateLS
+import itertools
 
 
 def generate_data_q_learn(rng, alpha_plus, alpha_minus, beta, n=100, p=0.2):
@@ -1746,6 +1748,11 @@ if __name__ == "__main__":
         max_std = 0
         max_skew = 0
         max_kurtosis = 0
+        mv_names = [
+            f"ses_{session}_{dbs}" for session in [1, 2, 3] for dbs in ["OFF", "ON"]
+        ]
+        p_explore_mv_dict = {name: [] for name in mv_names}
+        p_explore_mv_dict["group"] = []
         for inference in ["double", "suppression", "efferent", "dbs-all"]:
 
             # filter p_explore_data to only include the current inference type
@@ -1757,17 +1764,19 @@ if __name__ == "__main__":
             # create an array for the current inference type with shape (n_subjects, 3*2)
             # with the p_explore data for each session and dbs state combination
             p_explore_arr = np.zeros((n_subjects, 6))
-            for session_id, session in enumerate([1, 2, 3]):
-                for dbs in [0, 1]:
-                    for subject_idx, subject in enumerate(
-                        p_explore_data["subject"].unique()
-                    ):
-                        p_explore_arr[subject_idx, session_id * 2 + dbs] = (
-                            p_explore_data[
-                                (p_explore_data["subject"] == subject)
-                                & (p_explore_data["session"] == session)
-                                & (p_explore_data["dbs"] == ["OFF", "ON"][dbs])
-                            ]["p_explore"].values[0]
+            for subject_idx, subject in enumerate(p_explore_data["subject"].unique()):
+                p_explore_mv_dict["group"].append(inference)
+                for session_id, session in enumerate([1, 2, 3]):
+                    for dbs in [0, 1]:
+                        p_explore_val = p_explore_data[
+                            (p_explore_data["subject"] == subject)
+                            & (p_explore_data["session"] == session)
+                            & (p_explore_data["dbs"] == ["OFF", "ON"][dbs])
+                        ]["p_explore"].values[0]
+                        p_explore_arr[subject_idx, session_id * 2 + dbs] = p_explore_val
+                        # either create or append list in dictionary
+                        p_explore_mv_dict[f"ses_{session}_{["OFF", "ON"][dbs]}"].append(
+                            p_explore_val
                         )
 
             # average over subjects and get std
@@ -2043,3 +2052,50 @@ if __name__ == "__main__":
                     f"{inference}: {np.mean(pairwise_distances_dict[inference])} "
                     f"{np.std(pairwise_distances_dict[inference])}\n"
                 )
+
+        # analyze the p_explore mv data
+        p_explore_mv_df = pd.DataFrame(p_explore_mv_dict)
+
+        # remove nan values
+        p_explore_mv_df = p_explore_mv_df.dropna()
+
+        # create a multivariate linear model with group (i.e. inference type) predicting
+        # the p explore values
+
+        # example: formula = "locus_of_control + self_concept + motivation ~ read + write + science + prog"
+        formula = " + ".join(mv_names)
+        formula += (
+            " ~ C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])"
+        )
+        print(formula)
+        mod = MultivariateLS.from_formula(formula, data=p_explore_mv_df)
+        res = mod.fit()
+        yn = res.model.endog_names
+        xn = res.model.exog_names
+        print("\n")
+        print(yn, xn)
+
+        print("\n")
+        mvt = res.mv_test()
+        print(mvt.summary_frame)
+
+        print("\n")
+        print(res.summary())
+
+        # mv contrast tests:
+        mvt = res.mv_test(
+            hypotheses=[
+                (
+                    f"{group1}_vs_{group2}",
+                    [
+                        f"C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])[T.{group1}] - C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])[T.{group2}]"
+                    ],
+                    mv_names,
+                )
+                for group1, group2 in itertools.combinations(
+                    ["suppression", "efferent", "dbs-all"], 2
+                )
+            ]
+        )
+        print("\n")
+        print(mvt.summary_frame)
