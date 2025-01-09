@@ -26,8 +26,6 @@ import seaborn as sns
 import sys
 from concurrent.futures import ProcessPoolExecutor
 import pingouin as pg
-from sklearn.decomposition import PCA
-from scipy.spatial.distance import cdist
 from statsmodels.multivariate.multivariate_ols import MultivariateLS
 import itertools
 
@@ -1629,56 +1627,7 @@ if __name__ == "__main__":
                     [p_explore_data_all, p_explore_data], ignore_index=True
                 )
 
-        # loop over inference types and create boxplots over sessions and ANOVAs with
-        # factors dbs and session
-        for inference in ["double", "suppression", "efferent", "dbs-all"]:
-
-            # filter p_explore_data to only include the current inference type
-            p_explore_data = p_explore_data_all[
-                p_explore_data_all["inference"] == inference
-            ]
-
-            # plot the p explore data as boxplots with factors dbs and session using seaborn
-            az.style.use("default")
-            plt.figure(figsize=(10, 6))
-            sns.boxplot(
-                x="session",
-                y="p_explore",
-                hue="dbs",
-                data=p_explore_data,
-                palette={"ON": "red", "OFF": "blue"},
-                showmeans=True,
-                meanprops={
-                    # "marker": "o",
-                    "markerfacecolor": "black",
-                    "markeredgecolor": "white",
-                    # "markersize": 8,
-                },
-                linecolor="black",
-            )
-
-            plt.title(f"P(Explore) {inference}")
-            plt.xlabel("Session")
-            plt.ylabel("P(Explore)")
-            plt.legend(title="DBS State", loc="upper left")
-            plt.tight_layout()
-            plt.savefig(f"{save_folder}/p_explore_boxplot_inference_{inference}.png")
-            plt.close()
-
-            # Perform a two-way repeated measures ANOVA using pingouin
-            aov = pg.rm_anova(
-                dv="p_explore",
-                within=["dbs", "session"],
-                subject="subject",
-                data=p_explore_data,
-                detailed=True,
-            )
-
-            # Save the ANOVA results to a CSV file
-            aov.to_csv(
-                f"{save_folder}/p_explore_anova_inference_{inference}.csv", index=False
-            )
-
+        # FIRST: ANOVA (inference, dbs) for each session
         # loop over sessions and create boxplots over inference types and ANOVAs with
         # factors dbs and inference type
         for session in [1, 2, 3]:
@@ -1737,17 +1686,15 @@ if __name__ == "__main__":
                 f"{save_folder}/p_explore_anova_session_{session}.csv", index=False
             )
 
+        # SECOND: how similar with average distances
         # analyze for dbs variant (suppression, efferent, dbs-all) the p explore data
         # has the highest similarity to the patient data (double)
 
         # for each inference type create an array  with shape (n_subjects, 3*2)
         # with the p_explore data for each session and dbs state combination
+        # also average and std over subjects to get one vector for each inference type
         p_explore_arr_dict = {}
         p_explore_arr_all_dict = {}
-        max_mean = 0
-        max_std = 0
-        max_skew = 0
-        max_kurtosis = 0
         mv_names = [
             f"ses_{session}_{dbs}" for session in [1, 2, 3] for dbs in ["OFF", "ON"]
         ]
@@ -1773,33 +1720,21 @@ if __name__ == "__main__":
                             & (p_explore_data["session"] == session)
                             & (p_explore_data["dbs"] == ["OFF", "ON"][dbs])
                         ]["p_explore"].values[0]
+                        # the array for calculating the differences
                         p_explore_arr[subject_idx, session_id * 2 + dbs] = p_explore_val
-                        # either create or append list in dictionary
+                        # the dictionary for the multivariate linear model
                         p_explore_mv_dict[f"ses_{session}_{["OFF", "ON"][dbs]}"].append(
                             p_explore_val
                         )
 
-            # average over subjects and get std
+            # average/std over subjects to get the vector for the current inference type
             p_explore_arr_mean = np.nanmean(p_explore_arr, axis=0)
             p_explore_arr_std = np.nanstd(p_explore_arr, axis=0)
-            from scipy.stats import skew, kurtosis
-
-            p_explore_arr_skew = skew(p_explore_arr, axis=0, nan_policy="omit")
-            p_explore_arr_kurtosis = kurtosis(p_explore_arr, axis=0, nan_policy="omit")
-
-            # update the max moments
-            max_mean = max(max_mean, np.max(p_explore_arr_mean))
-            max_std = max(max_std, np.max(p_explore_arr_std))
-            max_skew = max(max_skew, np.max(p_explore_arr_skew))
-            max_kurtosis = max(max_kurtosis, np.max(p_explore_arr_kurtosis))
-
-            # add the p explore data to the dictionary
+            # store the vectors for the inference types in a dictionary
             p_explore_arr_dict[inference] = np.concatenate(
                 [
                     p_explore_arr_mean,
                     p_explore_arr_std,
-                    p_explore_arr_skew,
-                    p_explore_arr_kurtosis,
                 ]
             )
 
@@ -1808,14 +1743,8 @@ if __name__ == "__main__":
             p_explore_arr_all = p_explore_arr[~np.isnan(p_explore_arr).any(axis=1)]
             p_explore_arr_all_dict[inference] = p_explore_arr_all
 
-        # normalize p_explore_arr_dict to the max values
-        for inference in p_explore_arr_dict.keys():
-            p_explore_arr_dict[inference] /= np.repeat(
-                [max_mean, max_std, max_skew, max_kurtosis], 6
-            )
-
-        # calculate the euclidean distance of the average p explore data for each
-        # inference type compared to the p explore data of the double inference type
+        # calculate the euclidean distance of the vectors f the inference types compared
+        # to the double inference type
         norms_dict = {
             inference: np.linalg.norm(
                 p_explore_arr_dict[inference] - p_explore_arr_dict["double"]
@@ -1823,8 +1752,7 @@ if __name__ == "__main__":
             for inference in p_explore_arr_dict.keys()
         }
 
-        # calculate the differences separately for the "features" between the inferences
-        # and double inference
+        # calculate the differences separately for the "features"
         diffs_separrated_dict = {
             inference: p_explore_arr_dict[inference] - p_explore_arr_dict["double"]
             for inference in p_explore_arr_dict.keys()
@@ -1835,7 +1763,7 @@ if __name__ == "__main__":
         # colors
         diffs_df = pd.DataFrame(
             {
-                "inference": np.repeat(["suppression", "efferent", "dbs-all"], 6 * 4),
+                "inference": np.repeat(["suppression", "efferent", "dbs-all"], 6 * 2),
                 "feature": np.tile(
                     np.concatenate(
                         [
@@ -1854,22 +1782,6 @@ if __name__ == "__main__":
                                 "std/ON/2",
                                 "std/OFF/3",
                                 "std/ON/3",
-                            ],
-                            [
-                                "skew/OFF/1",
-                                "skew/ON/1",
-                                "skew/OFF/2",
-                                "skew/ON/2",
-                                "skew/OFF/3",
-                                "skew/ON/3",
-                            ],
-                            [
-                                "kurt/OFF/1",
-                                "kurt/ON/1",
-                                "kurt/OFF/2",
-                                "kurt/ON/2",
-                                "kurt/OFF/3",
-                                "kurt/ON/3",
                             ],
                         ]
                     ),
@@ -1901,189 +1813,31 @@ if __name__ == "__main__":
         plt.savefig(f"{save_folder}/p_explore_diffs.png")
         plt.close()
 
-        # PCA for visualization
-        pca = PCA(n_components=2)
-        p_explore_arr = np.vstack(list(p_explore_arr_dict.values()))
-        pca.fit(p_explore_arr)
-        p_explore_arr_pca = pca.transform(p_explore_arr)
-
-        # plot the p explore data in a 2D space
-        az.style.use("default")
-        plt.figure(figsize=(10, 6))
-        plt.scatter(
-            p_explore_arr_pca[:, 0],
-            p_explore_arr_pca[:, 1],
-            c=["blue", "green", "red", "purple"],
-        )
-        for inference, (x, y) in zip(
-            ["double", "suppression", "efferent", "dbs-all"], p_explore_arr_pca
-        ):
-            plt.text(x, y, inference + f" ({round(norms_dict[inference], 2)})")
-        plt.xlabel("PC1")
-        plt.ylabel("PC2")
-        plt.title("P(Explore) Differences")
-        plt.tight_layout()
-        plt.savefig(f"{save_folder}/p_explore_pca.png")
-        plt.close()
-
-        # calculate the pairwise euclidean distances of the p explore data
-        # for each inference type compared to the double inference type
-
-        pairwise_distances_dict = {}
-        for inference in p_explore_data_all["inference"].unique():
-            # get the p explore data for the current inference type and the double inference
-            p_explore_arr_double = p_explore_arr_all_dict["double"]
-            p_explore_arr_inference = p_explore_arr_all_dict[inference]
-
-            # calculate the pairwise distances
-            pairwise_distances_dict[inference] = cdist(
-                p_explore_arr_inference, p_explore_arr_double, metric="euclidean"
-            ).flatten()
-
-        # print means of the pairwise distances for each inference type
-        for inference in p_explore_data_all["inference"].unique():
-            print(
-                f"Mean pairwise distance {inference}: {np.mean(pairwise_distances_dict[inference])}"
-            )
-
-        # plot the pairwise distances as boxplots
-        az.style.use("default")
-        plt.figure(figsize=(10, 6))
-
-        groupsizes = [
-            len(pairwise_distances_dict["double"]),
-            len(pairwise_distances_dict["suppression"]),
-            len(pairwise_distances_dict["efferent"]),
-            len(pairwise_distances_dict["dbs-all"]),
-        ]
-
-        pairwise_distances_data_df = pd.DataFrame(
-            {
-                "inferece": np.repeat(
-                    ["double", "suppression", "efferent", "dbs-all"], groupsizes
-                ),
-                "distance": np.concatenate(
-                    [
-                        pairwise_distances_dict["double"],
-                        pairwise_distances_dict["suppression"],
-                        pairwise_distances_dict["efferent"],
-                        pairwise_distances_dict["dbs-all"],
-                    ]
-                ),
-            }
-        )
-
-        sns.boxplot(
-            data=pairwise_distances_data_df,
-            x="inferece",
-            y="distance",
-        )
-
-        # add the groupsizes as text above the boxplots
-        for group_id, groupsize in enumerate(groupsizes):
-            plt.text(
-                group_id,
-                plt.gca().get_ylim()[1]
-                + 0.01 * (plt.gca().get_ylim()[1] - plt.gca().get_ylim()[0]),
-                f"n={groupsize}",
-                ha="center",
-                va="bottom",
-            )
-
-        # add individual data points
-        sns.swarmplot(
-            data=pairwise_distances_data_df,
-            x="inferece",
-            y="distance",
-            color="black",
-            alpha=0.5,
-        )
-
-        plt.xlabel("Inference Type")
-        plt.ylabel("Pairwise Euclidean Distances")
-        plt.tight_layout()
-        plt.savefig(f"{save_folder}/p_explore_pairwise_distances.png")
-        plt.close()
-
-        # if we exclude the double inference the pairwise distances are created for
-        # simulation x vp combinations
-        # all inferences (suppression, efferent, dbs-all) have the same combinations
-        # --> within design
-        # do pairwise t-tests between suppression, efferent, dbs-all using pingouin
-        pairwise_distances_data_df = pairwise_distances_data_df[
-            pairwise_distances_data_df["inferece"] != "double"
-        ]
-        # add the subject (i.e. combination of simulation and vp) as a column
-        pairwise_distances_data_df["combination"] = np.concatenate(
-            [np.arange(groupsize) for groupsize in groupsizes[1:]]
-        )
-        # do pairwise t-tests
-        results = pg.pairwise_tests(
-            data=pairwise_distances_data_df,
-            dv="distance",
-            within="inferece",
-            subject="combination",
-            padjust="bonf",
-        )
-        # save the results to a csv file
-        results.to_csv(
-            f"{save_folder}/p_explore_similiarity_pairwise_t_tests.csv", index=False
-        )
-
-        # print the differences from norms_dict and the details of the pca result and
-        # the means and stds of the pairwise distances in a text file
+        # print the differences from norms_dict in a text file
         with open(f"{save_folder}/p_explore_differences_analysis.txt", "w") as f:
             f.write("P(Explore) Differences:\n")
             for inference, norm in norms_dict.items():
                 f.write(f"{inference}: {norm}\n")
-            f.write("\nPCA explained variance ratio:\n")
-            f.write(f"{pca.explained_variance_ratio_}\n")
-            f.write("PCA components:\n")
-            for component_id, component in enumerate(pca.components_):
-                f.write(f"Component {component_id}: {component}\n")
-            f.write("PCA cooridnates:\n")
-            for inference, pca_coords in zip(
-                ["double", "suppression", "efferent", "dbs-all"], p_explore_arr_pca
-            ):
-                f.write(f"{inference}: {pca_coords}\n")
-            f.write("\nPairwise distances means and stds:\n")
-            for inference in pairwise_distances_dict.keys():
-                f.write(
-                    f"{inference}: {np.mean(pairwise_distances_dict[inference])} "
-                    f"{np.std(pairwise_distances_dict[inference])}\n"
-                )
 
+        # THIRD: how similar with multivariate linear model contrasts (any inference
+        # significantly "closer" to double)
         # analyze the p_explore mv data
         p_explore_mv_df = pd.DataFrame(p_explore_mv_dict)
 
         # remove nan values
         p_explore_mv_df = p_explore_mv_df.dropna()
 
-        # create a multivariate linear model with group (i.e. inference type) predicting
-        # the p explore values
-
-        # example: formula = "locus_of_control + self_concept + motivation ~ read + write + science + prog"
+        # create a multivariate linear model with group (i.e. inference type, with
+        # baseline=double) predicting the p explore values
         formula = " + ".join(mv_names)
         formula += (
             " ~ C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])"
         )
-        print(formula)
         mod = MultivariateLS.from_formula(formula, data=p_explore_mv_df)
         res = mod.fit()
-        yn = res.model.endog_names
-        xn = res.model.exog_names
-        print("\n")
-        print(yn, xn)
-
-        print("\n")
-        mvt = res.mv_test()
-        print(mvt.summary_frame)
-
-        print("\n")
-        print(res.summary())
 
         # mv contrast tests:
-        mvt = res.mv_test(
+        mvt_contrasts = res.mv_test(
             hypotheses=[
                 (
                     f"{group1}_vs_{group2}",
@@ -2097,5 +1851,10 @@ if __name__ == "__main__":
                 )
             ]
         )
-        print("\n")
-        print(mvt.summary_frame)
+
+        # print the results in a text file
+        with open(f"{save_folder}/p_explore_differences_analysis.txt", "a") as f:
+            f.write("\n\nCoefficients for all 'features':")
+            f.write(str(res.summary()))
+            f.write("\n\nMV Contrast Tests:\n")
+            f.write(str(mvt_contrasts.summary_frame))
