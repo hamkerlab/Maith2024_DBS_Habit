@@ -2253,61 +2253,57 @@ def linear_regression():
 
     subject_id = []
     population_id = []
-    messure_id = []
+    dbs_id = []
     dbs_state = []
     population = []
-    rate_gpi = []
+    rate = []
 
     # lists for dataframe
     for i, state in enumerate(dbs_states):
         for j, pop in enumerate(populations):
             for k in range(len(data_dbs[0][0])):
-                subject_id.append(i)
+                subject_id.append(k)
                 population_id.append(j)
-                messure_id.append(k)
+                dbs_id.append(i)
                 dbs_state.append(state)
                 population.append(pop)
-                rate_gpi.append(data_dbs[i][j][k])
+                rate.append(data_dbs[i][j][k])
 
     # dataframe
     data_df = pd.DataFrame(
         {
             "subject_id": subject_id,
             "population_id": population_id,
-            "messure_id": messure_id,
+            "dbs_id": dbs_id,
             "dbs_state": dbs_state,
             "population": population,
-            "rate_gpi": rate_gpi,
+            "rate": rate,
         }
     )
 
     # save dataframe
-    filename = "statistic/regression"
+    filename = "statistic/regression_activity_change"
     save_table(data_df, filename)
 
     ##################### statistic mixed-effects model ################
+    for population_id, population in enumerate(data_df["population"].unique()):
+        data_df_pop = data_df[data_df["population"] == population]
+        # fit a mixed-effects model
+        model = smf.mixedlm(
+            "rate ~ C(dbs_state, Treatment('dbs-off'))",
+            data_df_pop,
+            groups=data_df_pop["subject_id"],
+        )
 
-    # fit a mixed-effects model
-    model = smf.mixedlm(
-        "rate_gpi ~ C(dbs_state, Treatment('dbs-off'))",
-        data_df,
-        groups=data_df["subject_id"],
-    )
+        result = model.fit()
 
-    """
-    # fit a mixed-effects model
-    model = smf.mixedlm(
-        "rate_gpi ~ C(dbs_state, Treatment('dbs-off')) * C(population)",
-        data_df,
-        groups=data_df["subject_id"],
-        re_formula="~ C(population)",
-    )
-    """
-
-    result = model.fit()
-
-    # print summary
-    print(result.summary())
+        # print summary
+        with open(
+            "statistic/regression_activity_change.txt",
+            ["a", "w"][int(population_id == 0)],
+        ) as f:
+            f.write(f"\n\n{population}\n")
+            f.write(result.summary().as_text())
 
 
 #####################################################################################################
