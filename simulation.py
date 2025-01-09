@@ -55,6 +55,8 @@ def trial(
     # set input
     IT.B = 1.0
 
+    # TODO: start monitor recording sum(exc) and sum(inh)
+
     # simulate max 3 seconds or when the threshhold is reached
     PFC.stop_condition = "(r > 0.8)"
     ann.simulate_until(max_duration=3000.0, population=PFC)
