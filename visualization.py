@@ -981,6 +981,32 @@ def activity_changes_dbs_on():
         # title
         axs[0].set_title("suppression", fontweight="bold", fontsize=label_size)
 
+        ############# significance* ####################
+        for i in range(len(mean_dbs2)):
+            if i < 4:
+                continue
+
+            if mean_dbs2[i] >= 0:
+                offset = +0.008
+                rot = -90
+            else:
+                if i == 8:
+                    offset = -0.01
+                else:
+                    offset = -0.008
+                rot = 90
+
+            axs[0].text(
+                x=mean_dbs2[i] + offset,  # leicht rechts des Balken-Endes
+                y=positions[i],  # exakt auf der y-Position des Balkens
+                s="*",  # Stern als Text
+                fontsize=10,  # Stern-Größe
+                color="black",  # Stern-Farbe
+                ha="center",  # Zentrierung horizontal
+                va="center",  # Zentrierung vertikal
+                rotation=rot,
+            )
+
         ####################### efferent data ################################
         for i in range(len(mean_dbs3)):
             # plot means
@@ -1022,6 +1048,29 @@ def activity_changes_dbs_on():
 
         # title
         axs[1].set_title("efferent", fontweight="bold", fontsize=label_size)
+
+        ############# significance* ####################
+        for i in range(len(mean_dbs3)):
+            if i < 4:
+                continue
+
+            if mean_dbs3[i] >= 0:
+                offset = +0.008
+                rot = -90
+            else:
+                offset = -0.008
+                rot = 90
+
+            axs[1].text(
+                x=mean_dbs3[i] + offset,  # leicht rechts des Balken-Endes
+                y=positions[i],  # exakt auf der y-Position des Balkens
+                s="*",  # Stern als Text
+                fontsize=10,  # Stern-Größe
+                color="black",  # Stern-Farbe
+                ha="center",  # Zentrierung horizontal
+                va="center",  # Zentrierung vertikal
+                rotation=rot,
+            )
 
         ####################### afferent data ################################
         for i in range(len(mean_dbs4)):
@@ -1065,6 +1114,37 @@ def activity_changes_dbs_on():
         # title
         axs[2].set_title("afferent", fontweight="bold", fontsize=label_size)
 
+        ############# significance* ####################
+        for i in range(len(mean_dbs4)):
+            if i < 4:
+                continue
+
+            if mean_dbs4[i] >= 0:
+                if i == 8:
+                    offset = +0.013
+                else:
+                    offset = +0.008
+
+                rot = -90
+            else:
+                if i == 4:
+                    offset = -0.005
+                else:
+                    offset = -0.008
+
+                rot = 90
+
+            axs[2].text(
+                x=mean_dbs4[i] + offset,  # leicht rechts des Balken-Endes
+                y=positions[i],  # exakt auf der y-Position des Balkens
+                s="*",  # Stern als Text
+                fontsize=10,  # Stern-Größe
+                color="black",  # Stern-Farbe
+                ha="center",  # Zentrierung horizontal
+                va="center",  # Zentrierung vertikal
+                rotation=rot,
+            )
+
         ####################### passing fibres data ################################
         for i in range(len(mean_dbs5)):
             # plot means
@@ -1104,7 +1184,30 @@ def activity_changes_dbs_on():
         # title
         axs[3].set_title("passing-fibres", fontweight="bold", fontsize=label_size)
 
-        ####################### bds-all data ################################
+        ############# significance* ####################
+        for i in range(len(mean_dbs5)):
+            if i < 3 or i > 7:
+                continue
+
+            if mean_dbs5[i] >= 0:
+                offset = +0.008
+                rot = -90
+            else:
+                offset = -0.008
+                rot = 90
+
+            axs[3].text(
+                x=mean_dbs5[i] + offset,  # leicht rechts des Balken-Endes
+                y=positions[i],  # exakt auf der y-Position des Balkens
+                s="*",  # Stern als Text
+                fontsize=10,  # Stern-Größe
+                color="black",  # Stern-Farbe
+                ha="center",  # Zentrierung horizontal
+                va="center",  # Zentrierung vertikal
+                rotation=rot,
+            )
+
+        ####################### dbs-comb data ################################
         for i in range(len(mean_dbs6)):
             # plot means
             axs[4].barh(
@@ -1142,6 +1245,35 @@ def activity_changes_dbs_on():
 
         # title
         axs[4].set_title("dbs-comb", fontweight="bold", fontsize=label_size)
+
+        ############# significance* ####################
+        for i in range(len(mean_dbs6)):
+            if i < 3 or i == 5:
+                continue
+
+            if mean_dbs6[i] >= 0:
+                offset = +0.008
+                rot = -90
+            else:
+                if i == 4:
+                    offset = -0.003
+                elif i == 8:
+                    offset = -0.010
+                else:
+                    offset = -0.008
+
+                rot = 90
+
+            axs[4].text(
+                x=mean_dbs6[i] + offset,  # leicht rechts des Balken-Endes
+                y=positions[i],  # exakt auf der y-Position des Balkens
+                s="*",  # Stern als Text
+                fontsize=10,  # Stern-Größe
+                color="black",  # Stern-Farbe
+                ha="center",  # Zentrierung horizontal
+                va="center",  # Zentrierung vertikal
+                rotation=rot,
+            )
 
         # Adjust layout to minimize margins
         # plt.subplots_adjust(left=0.07, right=0.96, top=0.9, bottom=0.15, wspace=0.2)
