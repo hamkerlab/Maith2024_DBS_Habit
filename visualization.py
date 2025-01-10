@@ -6,6 +6,7 @@ import pandas as pd
 import seaborn as sns
 import pingouin as pg
 from statannotations.Annotator import Annotator
+from statistic import load_data_previously_selected
 
 #################################################################################################################
 ########################################### plot figures ########################################################
@@ -22,6 +23,7 @@ __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
 __fig_weights_over_time__ = False
+__fig_support_over_time__ = False
 
 
 ##############################################################################
@@ -2740,6 +2742,120 @@ def weights_over_time():
     )
 
 
+def support_over_time():
+    """
+    Plots the support of the Thal neurons throughout the task for the different dbs types and shortcut modes.
+    """
+    # Load support data
+    """
+    save_variables(
+            variable_list=[support_dict],
+            name_list=[
+                f"support_values_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}"
+            ],
+            path="data/simulation_data/",
+        )
+    """
+    loaded_vars = load_variables(
+        name_list=[
+            f"support_values_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}"
+            for shortcut in [0, 1]
+            for dbs_state in range(6)
+            for column in range(100)
+        ],
+        path="data/simulation_data/",
+    )
+
+    # create a 6x2 plot plotting the support of the Thal neurons for each dbs state and
+    # shortcut mode averaged over all simulations
+    dbs_state_names = [
+        "DBS-OFF",
+        "suppression",
+        "efferent",
+        "afferent",
+        "passing fibres GPe-STN",
+        "dbs-comb",
+    ]
+
+    plt.figure(figsize=(10, 15))
+    # create two subplots for exc and inh support
+    ax_exc = plt.subplot(211)
+    ax_inh = plt.subplot(212)
+    for dbs_state in range(6):
+
+        # skip dbs states affernet and passing fibres GPe-STN
+        if dbs_state in [3, 4]:
+            continue
+
+        selection_data_df = load_data_previously_selected(
+            subject_type="simulation",
+            shortcut_type="plastic",
+            dbs_state="OFF" if dbs_state == 0 else "ON",
+            dbs_variant=dbs_state_names[dbs_state],
+            switch_choice_manipulation=None,
+        )
+
+        support_exc_for_0_mean = np.zeros(120)
+        support_inh_for_0_mean = np.zeros(120)
+        support_exc_for_selected_mean = np.zeros(120)
+        support_inh_for_selected_mean = np.zeros(120)
+        for subject in range(100):
+            # extract the choices from the current subject from the selection_data_df
+            # with columns subject, trial, choice,a nd reward
+            choices = (
+                selection_data_df[selection_data_df["subject"] == subject][
+                    "choice"
+                ].values
+                - 1
+            )
+            # get the supports for action 0 for the current subject
+            support_exc_for_0 = loaded_vars[
+                f"support_values_Shortcut1_DBS_State{dbs_state}_sim{subject}"
+            ]["support_exc"]
+            support_inh_for_0 = loaded_vars[
+                f"support_values_Shortcut1_DBS_State{dbs_state}_sim{subject}"
+            ]["support_inh"]
+            # get the supports for the selected action
+            support_exc_for_selected = support_exc_for_0.copy()
+            support_exc_for_selected[choices == 1] *= -1
+            support_inh_for_selected = support_inh_for_0.copy()
+            support_inh_for_selected[choices == 1] *= -1
+            # add the supports to the mean arrays
+            support_exc_for_0_mean += support_exc_for_0 / 100
+            support_inh_for_0_mean += support_inh_for_0 / 100
+            support_exc_for_selected_mean += support_exc_for_selected / 100
+            support_inh_for_selected_mean += support_inh_for_selected / 100
+
+        # the values of the keys contain dictionaries with keys "support_exc" and
+        # "support_inh" and np.ndarrays as values, the np.ndarrays have shape (120, )
+        # average over all keys the support_exc and support_inh arrays
+        support_exc = support_exc_for_selected_mean
+        support_inh = support_inh_for_selected_mean
+
+        # plot the support_exc and support_inh arrays
+        ax_exc.plot(
+            support_exc,
+            label=f"{dbs_state_names[dbs_state]}",
+            ls="--",
+            color=f"C{dbs_state}",
+        )
+        ax_inh.plot(
+            support_inh,
+            label=f"{dbs_state_names[dbs_state]}",
+            ls="-",
+            color=f"C{dbs_state}",
+        )
+
+    ax_inh.set_xlabel("trial")
+    ax_exc.set_ylabel("excitatory support for selected")
+    ax_inh.set_ylabel("inhibitory support for selected")
+    ax_inh.legend()
+
+    plt.tight_layout()
+    plt.savefig("fig/__fig_support_over_time__.png", dpi=300)
+    plt.close("all")
+
+
 #################################################################################################################
 ########################################### function call #######################################################
 #################################################################################################################
@@ -2778,3 +2894,6 @@ if __name__ == "__main__":
 
     if __fig_weights_over_time__:
         weights_over_time()
+
+    if __fig_support_over_time__:
+        support_over_time()
