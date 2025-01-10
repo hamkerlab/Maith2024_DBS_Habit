@@ -119,7 +119,7 @@ def trial(
     selected = np.argmax(PFC.r)
 
     # get support from monitor support and stop monitor
-    s_exc, s_inh = get_support(monitor_support, selected)
+    s_exc, s_inh = get_support(monitor_support)
 
     # always reward
     if immer:
