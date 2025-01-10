@@ -203,7 +203,7 @@ def shortcut_on_off(switch, number_of_simulations):
     plt.savefig("fig/__fig_shortcut_on_off__.png", dpi=300)
     plt.savefig("fig/__fig_shortcut_on_off__.svg", format="svg", dpi=300)
 
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -323,7 +323,7 @@ def shortcut_on_off_line(number_of_simulations):
     plt.savefig("fig/__fig_shortcut_on_off_line__.png", dpi=300)
     plt.savefig("fig/__fig_shortcut_on_off_line__.svg", format="svg", dpi=300)
 
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -720,7 +720,7 @@ def dbs_on_off_14_and_100(switch):
     plt.savefig("fig/__fig_dbs_on_off_14_and_100__.png", dpi=300)
     plt.savefig("fig/__fig_dbs_on_off_14_and_100__.svg", format="svg", dpi=300)
 
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -1158,7 +1158,7 @@ def activity_changes_dbs_on():
                 "fig/__fig_activity_change_dbs_on_learn__.svg", format="svg", dpi=300
             )
 
-        plt.show()
+        plt.close("all")
 
 
 #################################################################################################################
@@ -1297,7 +1297,7 @@ def activity_changes_dbs_off():
                 "fig/__fig_activity_change_dbs_off_learn__.svg", format="svg", dpi=300
             )
 
-        plt.show()
+        plt.close("all")
 
 
 #################################################################################################################
@@ -1392,7 +1392,7 @@ def gpi_scatter():
 
     plt.savefig("fig/__fig_gpi_scatter__.png", dpi=300)
     plt.savefig("fig/__fig_gpi_scatter__.svg", format="svg", dpi=300)
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -1596,7 +1596,7 @@ def load_simulate():
     plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
     plt.savefig("fig/__fig_load_simulate__.svg", format="svg", dpi=300)
 
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -1779,7 +1779,7 @@ def load_simulate_dbscomb():
     plt.savefig("fig/__fig_load_simulate_dbscomb__.png", dpi=300)
     plt.savefig("fig/__fig_load_simulate_dbscomb__.svg", format="svg", dpi=300)
 
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -1980,7 +1980,7 @@ def dbs_parameter():
     plt.tight_layout()
     plt.savefig("fig/__fig_dbs_parameter__.png", dpi=300)
     plt.savefig("fig/__fig_dbs_parameter__.svg", format="svg", dpi=300)
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -2219,7 +2219,7 @@ def parameter_gpi_inhib():
     plt.tight_layout()
     plt.savefig("fig/__appendix_fig_parameter_gpi_inhib__.png", dpi=300)
     plt.savefig("fig/__appendix_fig_parameter_gpi_inhib__.svg", format="svg", dpi=300)
-    plt.show()
+    plt.close("all")
 
 
 #################################################################################################################
@@ -2348,20 +2348,20 @@ def weights_over_time_boxplots(
         if len(specific_sessions) > 1:
             axes[i].legend_.remove()  # Remove individual legends
 
-        # make pariwise tests and annotate
-        if len(specific_sessions) == 1:
-            # pairs for statistic comparison
-            pairs = [
-                ("suppression", "OFF"),
-                ("efferent", "OFF"),
-                ("dbs-all", "OFF"),
-            ]
+        # # make pariwise tests and annotate
+        # if len(specific_sessions) == 1:
+        #     # pairs for statistic comparison
+        #     pairs = [
+        #         ("suppression", "OFF"),
+        #         ("efferent", "OFF"),
+        #         ("dbs-all", "OFF"),
+        #     ]
 
-            # make pairwise tests
-            a = Annotator(ax, pairs=pairs)
-            a.configure(test="t-test")
-            a.apply_test()
-            a.annotate()  # TODO find out how annotater works, make two-ways repeated anovas for dbs_state and dbs_type for each weight, e.g. w_direct_0 and than make paired t-tests with pingouin, then annotate p results in boxplot
+        #     # make pairwise tests
+        #     a = Annotator(ax, pairs=pairs)
+        #     a.configure(test="t-test")
+        #     a.apply_test()
+        #     a.annotate()  # TODO find out how annotater works, make two-ways repeated anovas for dbs_state and dbs_type for each weight, e.g. w_direct_0 and than make paired t-tests with pingouin, then annotate p results in boxplot
 
     if len(specific_sessions) > 1:
         # Create a single legend outside the subplots
@@ -2699,7 +2699,8 @@ def weights_over_time():
         specific_sessions=[3],
     )
 
-    df = df.copy()
+    # Perform two-way repeated measures ANOVA for each weight variable
+    # only for suppression, efferent, dbs-all and session 3
     specific_dbs_types = ["suppression", "efferent", "dbs-all"]
     specific_sessions = [3]
 

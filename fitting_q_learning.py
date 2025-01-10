@@ -1228,7 +1228,7 @@ def estimate_p_explore_process_subject(
     return p_explore
 
 
-def estimate_p_explore(data_on, data_off, save_folder, inference):
+def estimate_p_explore(data_on, data_off, save_folder, inference, only_plots=False):
     # load the inference data object
     idata = az.from_netcdf(
         f"{save_folder[:-len(sys.argv[1])]}{inference}/{inference}_idata.nc"
@@ -1275,6 +1275,9 @@ def estimate_p_explore(data_on, data_off, save_folder, inference):
     print(dbs_list)
     print(subject_list)
     print(p_explore_arr)
+
+    if only_plots:
+        return
 
     # create a dataframe with columns for the dbs state, subject, session and p_explore
     p_explore_data = pd.DataFrame(
@@ -1540,10 +1543,10 @@ if __name__ == "__main__":
     elif sys.argv[1] == "comparison":
         # load the inference data objects
         idata_single = az.from_netcdf(
-            f"{save_folder[:-len(sys.argv[1])] + 'single/'}single_idata.nc"
+            f"{save_folder[:-len(sys.argv[1])] + 'single_large/'}single_idata.nc"
         )
         idata_double = az.from_netcdf(
-            f"{save_folder[:-len(sys.argv[1])] + 'double/'}double_idata.nc"
+            f"{save_folder[:-len(sys.argv[1])] + 'double_large/'}double_idata.nc"
         )
 
         # model comparison using LOO (Leave-One-Out cross-validation)
@@ -1563,7 +1566,7 @@ if __name__ == "__main__":
     elif sys.argv[1] == "get_explore":
         # get the p explore data
         inference_types = ["double", "suppression", "efferent", "dbs-all"]
-        # inference_types = ["suppression"]  # TODO remove
+        # inference_types = ["double"]  # TODO remove
         for inference in inference_types:
             if inference == "double":
                 # load patient data
@@ -1602,6 +1605,7 @@ if __name__ == "__main__":
                 data_off=data_off,
                 save_folder=save_folder,
                 inference=inference,
+                only_plots=False,
             )
 
     elif sys.argv[1] == "analyze_explore":
