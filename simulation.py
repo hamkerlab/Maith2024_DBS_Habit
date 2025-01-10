@@ -5,6 +5,7 @@ import pandas as pd
 import sys
 import random
 from CompNeuroPy import save_variables
+import pickle
 
 
 ############################## fixed random values ##################################
@@ -21,6 +22,47 @@ def reset_activity():
     BG.PPN.B = 0.0
     BG.SNc.alpha = 0.0
     ann.simulate(200.0)
+
+
+def weighted_mean(arr):
+    """
+    Apply a weighted mean to the array. The weights are the inverse indices of the
+    array so that the first element has the highest weight and the last element the
+    lowest weight.
+    """
+    return np.average(arr, weights=np.arange(len(arr))[::-1])
+
+
+def get_support(monitor_support: ann.Monitor):
+    """
+    From the thalamic inputs recorded with the monitor, calculate the support for the
+    action 0 neuron from the inhibitory and excitatory inputs.
+
+    Returns:
+    support_exc: The support from the excitatory inputs
+    support_inh: The support from the inhibitory inputs
+    """
+    # get sum(exc) and sum(inh) from monitor, first index is the time, second index
+    # is the neuron index
+    sum_exc = monitor_support.get("sum(exc)")
+    sum_inh = monitor_support.get("sum(inh)")
+
+    # from sum_exc calculate support_exc by substracting the values of neuron 1 from
+    # neuron 0
+    support_exc = sum_exc[:, 0] - sum_exc[:, 1]
+    # average over time while weighting earlier time points higher
+    support_exc_ret = weighted_mean(support_exc)
+
+    # from sum_inh calculate support_inh by substracting the values of neuron 0 from
+    # neuron 1
+    support_inh = sum_inh[:, 1] - sum_inh[:, 0]
+    # average over time while weighting earlier time points higher
+    support_inh_ret = weighted_mean(support_inh)
+
+    # pause the monitor
+    monitor_support.pause()
+
+    return support_exc_ret, support_inh_ret
 
 
 ##############################################################################
@@ -43,6 +85,7 @@ def trial(
     dbs_state,
     DBS,
     GPi,
+    monitor_support: ann.Monitor,
 ):
     reward_setzen = False
     idx1 = 1
@@ -55,7 +98,8 @@ def trial(
     # set input
     IT.B = 1.0
 
-    # TODO: start monitor recording sum(exc) and sum(inh)
+    # start monitor recording sum(exc) and sum(inh)
+    monitor_support.resume()
 
     # simulate max 3 seconds or when the threshhold is reached
     PFC.stop_condition = "(r > 0.8)"
@@ -72,8 +116,12 @@ def trial(
 
     ############################## set reward ##################################
     # np.argmax(PFC.r) -> index with biggest fireing rate
-    # always reward
     selected = np.argmax(PFC.r)
+
+    # get support from monitor support and stop monitor
+    s_exc, s_inh = get_support(monitor_support, selected)
+
+    # always reward
     if immer:
         if (selected == 0) or (selected == 1):
             reward_setzen = True
@@ -109,7 +157,7 @@ def trial(
 
     ann.simulate(100)
 
-    return erfolg, selected
+    return erfolg, selected, s_exc, s_inh
 
 
 ##############################################################################
@@ -146,7 +194,9 @@ def create_reward(anz_trials, p, zufall):
 ####################### save rewards per session ##############################
 
 
-def save_data(success, selected_list, dbs_state, shortcut, plastic_weights):
+def save_data(
+    success, selected_list, support_list, dbs_state, shortcut, plastic_weights
+):
     success = [int(x) for x in success]
 
     column = int(sys.argv[1])
@@ -159,8 +209,6 @@ def save_data(success, selected_list, dbs_state, shortcut, plastic_weights):
         df.to_json(filepath, orient="records", lines=True)
 
         # save success and selected_list separately using pickle
-        import pickle
-
         with open(
             f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}.pkl",
             "wb",
@@ -172,6 +220,19 @@ def save_data(success, selected_list, dbs_state, shortcut, plastic_weights):
             variable_list=[plastic_weights],
             name_list=[
                 f"plastic_weights_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}"
+            ],
+            path="data/simulation_data/",
+        )
+
+        # save support values
+        support_dict = {
+            "support_exc": np.array(support_list)[:, 0],
+            "support_inh": np.array(support_list)[:, 1],
+        }
+        save_variables(
+            variable_list=[support_dict],
+            name_list=[
+                f"support_values_Shortcut{shortcut}_DBS_State{dbs_state}_sim{column}"
             ],
             path="data/simulation_data/",
         )
@@ -330,6 +391,7 @@ def simulate():
 
     success = []
     selected_list = []
+    support_list = []
     StrD1_GPi_list = []
     step = np.linspace(0, anz_trials - 1, 5).astype(int)
     reward = create_reward(anz_trials, belohnungsverteilung, zufall)
@@ -338,6 +400,8 @@ def simulate():
     ############################# initial monitor ###############################
 
     monitor = BG.BGMonitor([IT, StrD1, StrD2, STN, GPe, GPi, SNc, Thal, PFC, StrThal])
+    monitor_support = ann.Monitor(Thal, ["sum(exc)", "sum(inh)"])
+    monitor_support.pause()
 
     ################## simulate 120 trials (1 simulation) ######################
 
@@ -365,7 +429,7 @@ def simulate():
             schwellen = BG.extract_mean(
                 ITStrD1, ITStrD2, ITSTN, StrD1GPi, StrD2GPe, STNGPi
             )  # record means
-            rewarded, selected = trial(
+            rewarded, selected, s_exc, s_inh = trial(
                 t,
                 immer,
                 nie,
@@ -380,11 +444,13 @@ def simulate():
                 dbs_state,
                 DBS,
                 GPi,
+                monitor_support,
             )
             success.append(rewarded)  # record rewards
             selected_list.append(selected)  # record selection
+            support_list.append([s_exc, s_inh])  # record support
         else:
-            rewarded, selected = trial(
+            rewarded, selected, s_exc, s_inh = trial(
                 t,
                 immer,
                 nie,
@@ -399,9 +465,11 @@ def simulate():
                 dbs_state,
                 DBS,
                 GPi,
+                monitor_support,
             )
             success.append(rewarded)  # record rewards
             selected_list.append(selected)  # record selection
+            support_list.append([s_exc, s_inh])  # record support
             weigths = BG.extract_data(
                 SNc,
                 ITStrD1,
@@ -437,7 +505,9 @@ def simulate():
         # at the end of each trial get the plastic weights
         plastic_weights = BG.get_plastic_weights(plastic_weights)
 
-    save_data(success, selected_list, dbs_state, shortcut, plastic_weights)
+    save_data(
+        success, selected_list, support_list, dbs_state, shortcut, plastic_weights
+    )
 
     if save_parameter_data == "True" and dbs_state > 0 and dbs_state < 5:
         save_parameter(success, dbs_state, shortcut, parameter)

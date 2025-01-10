@@ -51,6 +51,6 @@ tmp.py
 
 pytensor*/
 
-data_old/*
+data_*/*
 
 *.tar*
