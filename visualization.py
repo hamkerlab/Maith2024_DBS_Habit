@@ -14,14 +14,14 @@ from statannotations.Annotator import Annotator
 __fig_shortcut_on_off_line__ = False
 __fig_shortcut_on_off__ = False
 __fig_dbs_on_off_14_and_100__ = False
-__fig_activity_changes_dbs_on__ = True
+__fig_activity_changes_dbs_on__ = False
 __fig_activity_changes_dbs_off__ = False
 __fig_gpi_scatter__ = False
 __fig_load_simulate__ = False
 __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
-__fig_weights_over_time__ = True
+__fig_weights_over_time__ = False
 
 
 ##############################################################################
@@ -915,7 +915,7 @@ def activity_changes_dbs_on():
             "dbs-comb",
             # "dbs-off",
         ]
-  
+
         label_y = [
             "$\\mathbf{Cor_{in}}$",
             "$\\mathbf{StrD1}$",
@@ -2747,7 +2747,7 @@ def weights_over_time():
 if __name__ == "__main__":
     if __fig_shortcut_on_off_line__:
         shortcut_on_off_line(14)
-        
+
     if __fig_shortcut_on_off__:
         shortcut_on_off(True, 14)
 
@@ -2768,7 +2768,7 @@ if __name__ == "__main__":
 
     if __fig_dbs_parameter__:
         dbs_parameter()
-        
+
     if __fig_load_simulate_dbscomb__:
         load_simulate_dbscomb()
 
