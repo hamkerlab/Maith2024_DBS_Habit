@@ -15,7 +15,7 @@ import statsmodels.formula.api as smf
 
 __fig_shortcut_on_off_line__ = False
 __fig_shortcut_on_off__ = False
-__fig_dbs_on_off_14_and_100__ = True
+__fig_dbs_on_off_14_and_100__ = False
 __fig_activity_changes_dbs_on__ = False
 __fig_activity_changes_dbs_off__ = False
 __fig_gpi_scatter__ = False
@@ -24,7 +24,7 @@ __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
 __fig_weights_over_time__ = False
-__fig_support_over_time__ = True
+__fig_support_over_time__ = False
 
 
 ##############################################################################
