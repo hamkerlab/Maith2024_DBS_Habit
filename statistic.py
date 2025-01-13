@@ -1130,14 +1130,12 @@ def dbs_on_vs_off(number_of_persons):
         ) as fh:
             fh.write(result.summary().as_text())
 
-        # Create a line plot for repeated measures
+        # Create a plot for repeated measures
         plt.figure(figsize=(8, 6))
-        sns.lineplot(
+        sns.stripplot(
             data=data_df,
             x="dbs_state",
             y="unrewarded_decisions",
-            hue="subject",
-            marker="o",
         )
         plt.title("Performance Across DBS Types for Each Subject")
         plt.xlabel("Treatment")
