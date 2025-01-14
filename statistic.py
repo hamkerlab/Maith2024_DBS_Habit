@@ -9,6 +9,130 @@ from tqdm import tqdm
 import statsmodels.formula.api as smf
 from statsmodels.multivariate.manova import MANOVA
 
+####################################### copied from fitting_q_learning ##############################################
+
+
+def transform_range(vector: np.ndarray, new_min, new_max):
+    return ((vector - vector.min()) / (vector.max() - vector.min())) * (
+        new_max - new_min
+    ) + new_min
+
+
+def load_experimental_data(
+    subject_type: str,
+    shortcut_type: str,
+    dbs_state: str,
+    dbs_variant: str,
+):
+    """
+    For all subjects load the choices and the obtained rewards for all trials.
+
+    Args:
+        subject_type (str):
+            "patient" or "simulation"
+        shortcut_type (str):
+            "plastic" or "fixed"
+        dbs_state (str):
+            "ON" or "OFF"
+        dbs_variant (str):
+            "off", "suppression", "efferent", "afferent", "passing", or "dbs-all"
+
+    Returns:
+        pd.DataFrame:
+            DataFrame containing the subject, trial, choice, reward and session columns
+    """
+    # data needs to be loaded differently for patients/simulations
+    if subject_type == "patient":
+        file_name = "data/patient_data/choices_rewards_per_trial.pkl"
+        # load data using pickle
+        with open(file_name, "rb") as f:
+            data_patients = pickle.load(f)
+        # load data about completed trials per session
+        completed = pd.read_json(
+            f"data/patient_data/Anz_CompleteTasks_{dbs_state}.json",
+            orient="records",
+            lines=True,
+        )
+        completed = completed.to_numpy().astype(int)
+        # get the correct format for the data
+        ret = {}
+        ret["subject"] = []
+        ret["trial"] = []
+        ret["choice"] = []
+        ret["reward"] = []
+        ret["session"] = []
+        for subject in data_patients:
+            for trial, choice in enumerate(
+                data_patients[subject][dbs_state]["choices"]
+            ):
+                ret["subject"].append(subject)
+                ret["trial"].append(trial)
+                ret["choice"].append(choice)
+            for reward in data_patients[subject][dbs_state]["rewards"]:
+                ret["reward"].append(reward)
+            # column for session (1, 2 or 3)
+            ret["session"].append(np.repeat(np.arange(1, 4), completed[subject, :]))
+
+        # concatenate the session column
+        ret["session"] = np.concatenate(ret["session"]).tolist()
+
+        # choices should be 0 and 1
+        ret["choice"] = (
+            transform_range(np.array(ret["choice"]), new_min=0, new_max=1)
+            .astype(int)
+            .tolist()
+        )
+
+    elif subject_type == "simulation":
+        shortcut_load = {"plastic": 1, "fixed": 0}[shortcut_type]
+        if dbs_state == "OFF":
+            dbs_load = 0
+        elif dbs_state == "ON":
+            dbs_load = {
+                "off": 0,
+                "suppression": 1,
+                "efferent": 2,
+                "afferent": 3,
+                "passing": 4,
+                "dbs-all": 5,
+            }[dbs_variant]
+        file_name = (
+            lambda sim_id: f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut_load}_DBS_State{dbs_load}_sim{sim_id}.pkl"
+        )
+        # load data using pickle
+        # get the correct format for the data
+        ret = {}
+        ret["subject"] = []
+        ret["trial"] = []
+        ret["choice"] = []
+        ret["reward"] = []
+        ret["session"] = []
+        for sim_id in range(100):
+            with open(file_name(sim_id), "rb") as f:
+                data_patients = pickle.load(f)
+                for trial, choice in enumerate(data_patients["choices"]):
+                    ret["subject"].append(sim_id)
+                    ret["trial"].append(trial)
+                    # choice+1 to obtain choices 1 and 2 as for patients
+                    ret["choice"].append(choice + 1)
+                for reward in data_patients["rewards"]:
+                    ret["reward"].append(reward)
+            # column for session (1, 2 or 3), each session has 40 trials
+            ret["session"].append(np.repeat(np.arange(1, 4), 40))
+
+        # concatenate the session column
+        ret["session"] = np.concatenate(ret["session"]).tolist()
+
+        # choices should be 0 and 1
+        ret["choice"] = (
+            transform_range(np.array(ret["choice"]), new_min=0, new_max=1)
+            .astype(int)
+            .tolist()
+        )
+
+    return pd.DataFrame(ret)
+
+
 #####################################################################################################
 ####################################### ground functions ############################################
 #####################################################################################################
@@ -1053,59 +1177,107 @@ def pairwise_ttest(*values):
 #####################################################################################################
 
 
-def dbs_on_vs_off(number_of_persons):
+def dbs_on_vs_off(number_of_persons=None, shortcut=True):
     """
     Compare the unrewarded decisions of the different DBS states to the baseline
     (dbs-off) using a linear mixed effect model. Then compare the different DBS
     states (excluding afferent and dbs-off) in session 3 using a repeated measures
     ANOVA.
+
+    Args:
+        number_of_persons (int):
+            Number of simulation to consider. If None use patient data.
+        shortcut (bool):
+            If True use plastic shortcut data, otherwise use the fixed shortcut data.
+
+    Returns:
+        data_df_full (pd.DataFrame):
+            DataFrame with columns:
+                "subject"
+                "unrewarded_decisions"
+                "dbs_state"
+                "session"
     """
-    # Get data in long format with the columns:
-    #   "subject"
-    #   "unrewarded_decisions"
-    #   "dbs_state" (dbs-off, suppression, efferent, afferent, passing fibres, dbs-comb)
-    #   "session" (1, 2, 3)
-    data_dict = {
-        "subject": [],
-        "unrewarded_decisions": [],
-        "dbs_state": [],
-        "session": [],
-    }
+    if number_of_persons is not None:
+        # Get data in long format with the columns:
+        #   "subject"
+        #   "unrewarded_decisions"
+        #   "dbs_state" (dbs-off, suppression, efferent, afferent, passing fibres, dbs-comb)
+        #   "session" (1, 2, 3)
+        data_dict = {
+            "subject": [],
+            "unrewarded_decisions": [],
+            "dbs_state": [],
+            "session": [],
+        }
 
-    # for each dbs state load data and add it to the dictionary
-    for dbs_state_id, dbs_state_name in [
-        [0, "dbs-off"],
-        [1, "suppression"],
-        [2, "efferent"],
-        [3, "afferent"],
-        [4, "passing fibres"],
-        [5, "dbs-comb"],
-    ]:
-        # load the rewarded decisions data
-        rewarded_decisions_data = read_json_data(
-            f"data/simulation_data/Results_Shortcut1_DBS_State{dbs_state_id}.json"
+        # for each dbs state load data and add it to the dictionary
+        for dbs_state_id, dbs_state_name in [
+            [0, "dbs-off"],
+            [1, "suppression"],
+            [2, "efferent"],
+            [3, "afferent"],
+            [4, "passing fibres"],
+            [5, "dbs-comb"],
+        ]:
+            # load the rewarded decisions data
+            rewarded_decisions_data = read_json_data(
+                f"data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State{dbs_state_id}.json"
+            )
+
+            # convert to array with unrewarded decisions per session
+            unrewarded_per_session = processing_habit_data(
+                rewarded_decisions_data, number_of_persons
+            )
+
+            # loop over subjects, here we only use simulation data therefore we have
+            # the same subject ids for each dbs type
+            for subject_id, unrewarded_decisions in enumerate(unrewarded_per_session):
+                # loop over sessions
+                for session_id, unrewarded_decisions_session in enumerate(
+                    unrewarded_decisions
+                ):
+                    # add data to the dictionary
+                    data_dict["subject"].append(subject_id)
+                    data_dict["unrewarded_decisions"].append(
+                        unrewarded_decisions_session
+                    )
+                    data_dict["dbs_state"].append(dbs_state_name)
+                    data_dict["session"].append(session_id + 1)
+
+        # convert dictionary to pandas dataframe
+        data_df_full = pd.DataFrame(data_dict)
+
+    else:
+        # create the same dataframe for the patient data
+        selections_patients_OFF_df = load_experimental_data(
+            subject_type="patient",
+            shortcut_type=None,
+            dbs_state="OFF",
+            dbs_variant=None,
         )
-
-        # convert to array with unrewarded decisions per session
-        unrewarded_per_session = processing_habit_data(
-            rewarded_decisions_data, number_of_persons
+        selections_patients_ON_df = load_experimental_data(
+            subject_type="patient",
+            shortcut_type=None,
+            dbs_state="ON",
+            dbs_variant=None,
         )
-
-        # loop over subjects, here we only use simulation data therefore we have
-        # the same subject ids for each dbs type
-        for subject_id, unrewarded_decisions in enumerate(unrewarded_per_session):
-            # loop over sessions
-            for session_id, unrewarded_decisions_session in enumerate(
-                unrewarded_decisions
-            ):
-                # add data to the dictionary
-                data_dict["subject"].append(subject_id)
-                data_dict["unrewarded_decisions"].append(unrewarded_decisions_session)
-                data_dict["dbs_state"].append(dbs_state_name)
-                data_dict["session"].append(session_id + 1)
-
-    # convert dictionary to pandas dataframe
-    data_df_full = pd.DataFrame(data_dict)
+        # combine both dataframes with a new column "dbs_state"
+        selections_patients_OFF_df["dbs_state"] = "dbs-off"
+        selections_patients_ON_df["dbs_state"] = "dbs-on"
+        selections_patients_df = pd.concat(
+            [selections_patients_OFF_df, selections_patients_ON_df]
+        )
+        # add the new column "unrewarded decisions" to the dataframe (1-reward column)
+        selections_patients_df["unrewarded_decisions"] = (
+            1 - selections_patients_df["reward"]
+        )
+        # now sum up the unrewarded decisions for each session and subject over all trials of the session
+        data_df_full = (
+            selections_patients_df.groupby(["subject", "session", "dbs_state"])
+            .sum()
+            .reset_index()
+        )
 
     # run linear mixed effect model for each session
     # fixed effect for dbs_state compared to baseline (dbs-off)
@@ -1125,49 +1297,99 @@ def dbs_on_vs_off(number_of_persons):
 
         # save results
         with open(
-            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons}_session_{session}.txt",
+            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons if number_of_persons is not None else 'patients'}_shortcut{int(shortcut)}_session_{session}.txt",
             "w",
         ) as fh:
             fh.write(result.summary().as_text())
 
-        # Create a plot for repeated measures
-        plt.figure(figsize=(8, 6))
-        sns.stripplot(
-            data=data_df,
-            x="dbs_state",
-            y="unrewarded_decisions",
+        # Create a plot for repeated measures with lines for each subject
+        # ignore index in data_df
+
+        # create subplots for each dbs state
+        _, ax = plt.subplots(
+            nrows=1,
+            ncols=len(data_df["dbs_state"].unique()) - 1,
+            figsize=(len(data_df["dbs_state"].unique()) * 3, 5),
         )
-        plt.title("Performance Across DBS Types for Each Subject")
-        plt.xlabel("Treatment")
-        plt.ylabel("Performance")
-        plt.legend(title="Subject", bbox_to_anchor=(1.05, 1), loc="upper left")
+        for i, dbs_state in enumerate(
+            data_df[data_df["dbs_state"] != "dbs-off"]["dbs_state"].unique()
+        ):
+            # only contain the dbs state and dbs-off
+            data_df_subplot = data_df.copy()
+            data_df_subplot = data_df_subplot[
+                data_df_subplot["dbs_state"].isin(["dbs-off", dbs_state])
+            ]
+            # order the dbs states
+            dbs_state_names_in_df = data_df_subplot["dbs_state"].unique()
+            # remove dbs-off from the list
+            dbs_state_names_in_df = dbs_state_names_in_df[
+                dbs_state_names_in_df != "dbs-off"
+            ]
+            # prepend dbs-off to the list
+            order = np.insert(dbs_state_names_in_df, 0, "dbs-off")
+            data_df_subplot["dbs_state"] = pd.Categorical(
+                data_df_subplot["dbs_state"], categories=order, ordered=True
+            )
+            if number_of_persons is None or number_of_persons == 14:
+                data_df_subplot["subject"] = data_df_subplot["subject"].astype(
+                    "category"
+                )
+                data_df_subplot = data_df_subplot.reset_index(drop=True)
+                sns.lineplot(
+                    data=data_df_subplot,
+                    x="dbs_state",
+                    y="unrewarded_decisions",
+                    hue="subject",
+                    style="subject",
+                    ax=ax[i] if len(data_df["dbs_state"].unique()) > 2 else ax,
+                    legend=False,
+                )
+                # additionally add a barplot with se as error bars
+                sns.barplot(
+                    data=data_df_subplot,
+                    x="dbs_state",
+                    y="unrewarded_decisions",
+                    ax=ax[i] if len(data_df["dbs_state"].unique()) > 2 else ax,
+                    errorbar=("se", 1),
+                )
+            else:
+                sns.boxplot(
+                    data=data_df_subplot,
+                    x="dbs_state",
+                    y="unrewarded_decisions",
+                    ax=ax[i] if len(data_df["dbs_state"].unique()) > 2 else ax,
+                )
         plt.tight_layout()
         plt.savefig(
-            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons}_session_{session}.png"
+            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons if number_of_persons is not None else 'patients'}_shortcut{int(shortcut)}_session_{session}.png"
+        )
+        plt.close()
+
+    if number_of_persons is not None:
+        # for session 3 compare the different dbs states (excluding afferent and dbs-off)
+        # using a repeated measures ANOVA using pingouin rm_anova
+        data_df = data_df_full.copy()
+        data_df = data_df[data_df["session"] == 3]
+        data_df = data_df[data_df["dbs_state"] != "afferent"]
+        data_df = data_df[data_df["dbs_state"] != "dbs-off"]
+        data_df["dbs_state"] = data_df["dbs_state"].astype("category")
+        data_df["session"] = data_df["session"].astype("category")
+        aov = pg.rm_anova(
+            data=data_df,
+            dv="unrewarded_decisions",
+            within="dbs_state",
+            subject="subject",
+            detailed=True,
         )
 
-    # for session 3 compare the different dbs states (excluding afferent and dbs-off)
-    # using a repeated measures ANOVA using pingouin rm_anova
-    data_df = data_df_full.copy()
-    data_df = data_df[data_df["session"] == 3]
-    data_df = data_df[data_df["dbs_state"] != "afferent"]
-    data_df = data_df[data_df["dbs_state"] != "dbs-off"]
-    data_df["dbs_state"] = data_df["dbs_state"].astype("category")
-    data_df["session"] = data_df["session"].astype("category")
-    aov = pg.rm_anova(
-        data=data_df,
-        dv="unrewarded_decisions",
-        within="dbs_state",
-        subject="subject",
-        detailed=True,
-    )
+        # save results
+        with open(
+            f"statistic/simulation_data_difference_dbs_variants_{number_of_persons}_shortcut{int(shortcut)}_session_3.txt",
+            "w",
+        ) as fh:
+            fh.write(aov.round(3).to_string())
 
-    # save results
-    with open(
-        f"statistic/simulation_data_difference_dbs_variants_{number_of_persons}_session_3.txt",
-        "w",
-    ) as fh:
-        fh.write(aov.round(3).to_string())
+    return data_df_full
 
 
 #####################################################################################################
@@ -1278,8 +1500,74 @@ def run_statistic(H1, H2, H3, number_of_persons):
     if H2:
         print("stats H2 with n = ", number_of_persons)
 
-        # compare dbs on vs off and different dbs types in session 3
-        dbs_on_vs_off(number_of_persons)
+        # compare dbs on vs off and different dbs types for plastic and fixed shortcut
+        data_df_full_sims = dbs_on_vs_off(number_of_persons, shortcut=True)
+        dbs_on_vs_off(number_of_persons, shortcut=False)
+        # also perform the analysis for the patient data and compare patients with sims
+        data_df_full_patients = dbs_on_vs_off(number_of_persons=None)
+
+        # change the values of the column subject to "patient X" and "simulation X"
+        # where X is the previous value of the subject column
+        data_df_full_patients["subject"] = "patient " + data_df_full_patients[
+            "subject"
+        ].astype(str)
+        data_df_full_sims["subject"] = "simulation " + data_df_full_sims[
+            "subject"
+        ].astype(str)
+
+        # for loop over sessions
+        for session in data_df_full_sims["session"].unique():
+            # for loop over dbs states
+            for dbs_state in data_df_full_sims["dbs_state"].unique():
+                # skip afferent and dbs-off
+                if dbs_state == "afferent" or dbs_state == "dbs-off":
+                    continue
+                # filter the simulation data for the current dbs state and dbs-off
+                data_df_full_sims_filtered = data_df_full_sims[
+                    data_df_full_sims["dbs_state"].isin(["dbs-off", dbs_state])
+                ].copy()
+                # rename the dbs state of the sims to dbs-on
+                data_df_full_sims_filtered.loc[
+                    data_df_full_sims_filtered["dbs_state"] == dbs_state, "dbs_state"
+                ] = "dbs-on"
+                # combine the patient and simulation data and add the column "subject_type"
+                data_df_full_sims_filtered["subject_type"] = "simulation"
+                data_df_full_patients["subject_type"] = "patient"
+                data_df_full_combined = pd.concat(
+                    [data_df_full_sims_filtered, data_df_full_patients]
+                )
+                # filter data to only contain session
+                data_df_full_combined = data_df_full_combined[
+                    data_df_full_combined["session"] == session
+                ]
+                # perform a 2 way repeated measures ANOVA with between factor
+                # "subject_type" and within factor "dbs_state"
+                aov = pg.mixed_anova(
+                    data=data_df_full_combined,
+                    dv="unrewarded_decisions",
+                    within="dbs_state",
+                    subject="subject",
+                    between="subject_type",
+                )
+                # save results
+                with open(
+                    f"statistic/patients_vs_sims_{number_of_persons}_{dbs_state}_ses_{session}.txt",
+                    "w",
+                ) as fh:
+                    fh.write(aov.round(3).to_string())
+
+                # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
+                plt.figure(figsize=(10, 6))
+                sns.boxplot(
+                    data=data_df_full_combined,
+                    x="subject_type",
+                    y="unrewarded_decisions",
+                    hue="dbs_state",
+                )
+                plt.savefig(
+                    f"statistic/patients_vs_sims_{number_of_persons}_{dbs_state}_ses_{session}.png",
+                )
+                plt.close()
 
     if H3:
         dbs_state = [

@@ -5,7 +5,6 @@ from CompNeuroPy import load_variables
 import pandas as pd
 import seaborn as sns
 import pingouin as pg
-from statannotations.Annotator import Annotator
 from statistic import load_data_previously_selected
 import statsmodels.formula.api as smf
 
@@ -334,16 +333,23 @@ def shortcut_on_off_line(number_of_simulations):
 #################################################################################################################
 
 
-def dbs_on_off_14_and_100(switch):
+def dbs_on_off_14_and_100(switch=True, shortcut=True):
+    """
+    Args:
+    switch: bool
+        if True use data from unrewarded decisions, else not sure maybe rewarded decisions
+    shortcut: bool
+        if True use data from plastic shortcut, else fixed shortcut
+    """
 
     ################################################# load data #################################################
     # load simulation data
-    filepath1 = "data/simulation_data/Results_Shortcut1_DBS_State1.json"
-    filepath2 = "data/simulation_data/Results_Shortcut1_DBS_State2.json"
-    # filepath3 = "data/simulation_data/Results_Shortcut1_DBS_State3.json"
-    filepath4 = "data/simulation_data/Results_Shortcut1_DBS_State4.json"
-    filepath5 = "data/simulation_data/Results_Shortcut1_DBS_State5.json"
-    filepath6 = "data/simulation_data/Results_Shortcut1_DBS_State0.json"
+    filepath1 = f"data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State1.json"
+    filepath2 = f"data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State2.json"
+    # filepath3 = "data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State3.json"
+    filepath4 = f"data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State4.json"
+    filepath5 = f"data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State5.json"
+    filepath6 = f"data/simulation_data/Results_Shortcut{int(shortcut)}_DBS_State0.json"
 
     result1 = stat.read_json_data(filepath1)
     result2 = stat.read_json_data(filepath2)
@@ -720,8 +726,14 @@ def dbs_on_off_14_and_100(switch):
     plt.text(0.01, 0.35, "C", transform=plt.gcf().transFigure, fontsize=11)
 
     # save fig
-    plt.savefig("fig/__fig_dbs_on_off_14_and_100__.png", dpi=300)
-    plt.savefig("fig/__fig_dbs_on_off_14_and_100__.svg", format="svg", dpi=300)
+    plt.savefig(
+        f"fig/__fig_dbs_on_off_14_and_100_Shortcut{int(shortcut)}__.png", dpi=300
+    )
+    plt.savefig(
+        f"fig/__fig_dbs_on_off_14_and_100_Shortcut{int(shortcut)}__.svg",
+        format="svg",
+        dpi=300,
+    )
 
     plt.close("all")
 
@@ -2875,7 +2887,7 @@ def weights_over_time():
     )
 
 
-def support_over_time():
+def support_over_time(shortcut=True, for_selected=True):
     """
     Plots the support of the Thal neurons throughout the task for the different dbs types and shortcut modes.
     """
@@ -2890,8 +2902,6 @@ def support_over_time():
         path="data/simulation_data/",
     )
 
-    # create a 6x2 plot plotting the support of the Thal neurons for each dbs state and
-    # shortcut mode averaged over all simulations
     dbs_state_names = [
         "dbs-off",
         "suppression",
@@ -2901,11 +2911,6 @@ def support_over_time():
         "dbs-comb",
     ]
 
-    plt.figure(figsize=(10, 15))
-    # create two subplots for exc and inh support
-    ax_exc = plt.subplot(311)
-    ax_inh = plt.subplot(312)
-    ax_diff = plt.subplot(313)
     support_exc_plot_dict = {
         "dbs_state": [],
         "subject": [],
@@ -2933,16 +2938,12 @@ def support_over_time():
 
         selection_data_df = load_data_previously_selected(
             subject_type="simulation",
-            shortcut_type="plastic",
+            shortcut_type="plastic" if shortcut else "fixed",
             dbs_state="OFF" if dbs_state == 0 else "ON",
             dbs_variant=dbs_state_names[dbs_state],
             switch_choice_manipulation=None,
         )
 
-        support_exc_for_0_mean = np.zeros(120)
-        support_inh_for_0_mean = np.zeros(120)
-        support_exc_for_selected_mean = np.zeros(120)
-        support_inh_for_selected_mean = np.zeros(120)
         support_exc_all = np.zeros((100, 120))
         support_inh_all = np.zeros((100, 120))
         for subject in range(100):
@@ -2956,28 +2957,27 @@ def support_over_time():
             )
             # get the supports for action 0 for the current subject
             support_exc_for_0 = loaded_vars[
-                f"support_values_Shortcut0_DBS_State{dbs_state}_sim{subject}"
+                f"support_values_Shortcut{int(shortcut)}_DBS_State{dbs_state}_sim{subject}"
             ]["support_exc"]
             support_inh_for_0 = loaded_vars[
-                f"support_values_Shortcut0_DBS_State{dbs_state}_sim{subject}"
+                f"support_values_Shortcut{int(shortcut)}_DBS_State{dbs_state}_sim{subject}"
             ]["support_inh"]
             # get the supports for the selected action
             support_exc_for_selected = support_exc_for_0.copy()
             support_exc_for_selected[choices == 1] *= -1
             support_inh_for_selected = support_inh_for_0.copy()
             support_inh_for_selected[choices == 1] *= -1
-            # add the supports to the mean arrays
-            support_exc_for_0_mean += support_exc_for_0 / 100
-            support_inh_for_0_mean += support_inh_for_0 / 100
-            support_exc_for_selected_mean += support_exc_for_selected / 100
-            support_inh_for_selected_mean += support_inh_for_selected / 100
 
             # store the support arrays and indice arrays centered around the change points
-            support_exc_all[subject] = support_exc_for_selected
-            support_inh_all[subject] = support_inh_for_selected
+            support_exc_all[subject] = (
+                support_exc_for_selected if for_selected else support_exc_for_0
+            )
+            support_inh_all[subject] = (
+                support_inh_for_selected if for_selected else support_inh_for_0
+            )
 
         # bin the trials and average over the values within each bin
-        bin_size = 40
+        bin_size = 40 if for_selected else 5
         support_exc_binned = np.nanmean(
             support_exc_all.reshape(100, -1, bin_size),
             axis=2,
@@ -3012,102 +3012,131 @@ def support_over_time():
         support_diff_plot_dict["bin"].extend(bin_long)
         support_diff_plot_dict["support"].extend(support_diff_binned.flatten())
 
-    # use the data from support_exc_plot_dict to plot boxplots using seaborn with
-    # x="bin", y="support", hue="dbs_state"
-    sns.boxplot(
-        x="bin",
-        y="support",
-        hue="dbs_state",
-        palette={
-            "suppression": (1, 0.7, 0.7, 0.8),
-            "efferent": (1, 0.5, 0.5, 0.8),
-            "dbs-comb": (0.8, 0, 0, 0.8),
-            "dbs-off": "darkblue",
-        },
-        data=pd.DataFrame.from_dict(support_exc_plot_dict),
-        ax=ax_exc,
-        showmeans=True,
-        meanprops={
-            "markerfacecolor": "black",
-            "markeredgecolor": "white",
-        },
-        linecolor="black",
-    )
-    ax_exc.axhline(0, color="black", linestyle="--", alpha=0.5)
-    # same for support_inh_plot_dict
-    sns.boxplot(
-        x="bin",
-        y="support",
-        hue="dbs_state",
-        palette={
-            "suppression": (1, 0.7, 0.7, 0.8),
-            "efferent": (1, 0.5, 0.5, 0.8),
-            "dbs-comb": (0.8, 0, 0, 0.8),
-            "dbs-off": "darkblue",
-        },
-        data=pd.DataFrame.from_dict(support_inh_plot_dict),
-        ax=ax_inh,
-        showmeans=True,
-        meanprops={
-            "markerfacecolor": "black",
-            "markeredgecolor": "white",
-        },
-        linecolor="black",
-    )
-    ax_inh.axhline(0, color="black", linestyle="--", alpha=0.5)
-    # same for support_diff_plot_dict
-    support_diff_df = pd.DataFrame.from_dict(support_diff_plot_dict)
-    sns.boxplot(
-        x="bin",
-        y="support",
-        hue="dbs_state",
-        palette={
-            "suppression": (1, 0.7, 0.7, 0.8),
-            "efferent": (1, 0.5, 0.5, 0.8),
-            "dbs-comb": (0.8, 0, 0, 0.8),
-            "dbs-off": "darkblue",
-        },
-        data=support_diff_df,
-        ax=ax_diff,
-        showmeans=True,
-        meanprops={
-            "markerfacecolor": "black",
-            "markeredgecolor": "white",
-        },
-        linecolor="black",
-    )
-    ax_diff.axhline(0, color="black", linestyle="--", alpha=0.5)
+    # convert the dictionaries to pandas dataframes
+    support_exc_df = pd.DataFrame.from_dict(support_exc_plot_dict)
+    support_inh_df = pd.DataFrame.from_dict(support_inh_plot_dict)
 
-    ax_exc.set_ylabel("shortcuts' support for selected")
-    ax_inh.set_ylabel("basal ganglias' support for selected")
-    ax_diff.set_ylabel(
-        "relative support\n= shortcuts' support - basal ganglias' support"
-    )
-
-    plt.tight_layout()
-    plt.savefig("fig/__fig_support_over_time__.png", dpi=300)
-    plt.close("all")
-
-    # run linear mixed effect model for each bin of support_diff_df
-    # fixed effect for dbs_state compared to baseline (dbs-off)
-    for bin in support_diff_df["bin"].unique():
-        data_df = support_diff_df.copy()
-        data_df = data_df[data_df["bin"] == bin]
-        data_df["dbs_state"] = data_df["dbs_state"].astype("category")
-        data_df["bin"] = data_df["bin"].astype("category")
-        model = smf.mixedlm(
-            "support ~ C(dbs_state, Treatment('dbs-off'))",
-            data_df,
-            groups=data_df["subject"],
+    # do plotting
+    if for_selected:
+        # use the data from support_exc_plot_dict to plot boxplots using seaborn with
+        # x="bin", y="support", hue="dbs_state"
+        plt.figure(figsize=(10, 15))
+        # create three subplots for exc, inh support
+        ax_exc = plt.subplot(211)
+        ax_inh = plt.subplot(212)
+        sns.boxplot(
+            x="bin",
+            y="support",
+            hue="dbs_state",
+            palette={
+                "suppression": (1, 0.7, 0.7, 0.8),
+                "efferent": (1, 0.5, 0.5, 0.8),
+                "dbs-comb": (0.8, 0, 0, 0.8),
+                "dbs-off": "darkblue",
+            },
+            data=support_exc_df,
+            ax=ax_exc,
+            showmeans=True,
+            meanprops={
+                "markerfacecolor": "black",
+                "markeredgecolor": "white",
+            },
+            linecolor="black",
         )
-        result = model.fit()
+        ax_exc.axhline(0, color="black", linestyle="--", alpha=0.5)
+        # same for support_inh_plot_dict
+        sns.boxplot(
+            x="bin",
+            y="support",
+            hue="dbs_state",
+            palette={
+                "suppression": (1, 0.7, 0.7, 0.8),
+                "efferent": (1, 0.5, 0.5, 0.8),
+                "dbs-comb": (0.8, 0, 0, 0.8),
+                "dbs-off": "darkblue",
+            },
+            data=support_inh_df,
+            ax=ax_inh,
+            showmeans=True,
+            meanprops={
+                "markerfacecolor": "black",
+                "markeredgecolor": "white",
+            },
+            linecolor="black",
+            legend=False,
+        )
+        ax_inh.axhline(0, color="black", linestyle="--", alpha=0.5)
 
-        # save results
-        with open(
-            f"statistic/support_difference_dbs_on_off_bin_{bin}.txt",
-            "w",
-        ) as fh:
-            fh.write(result.summary().as_text())
+        ax_exc.set_ylabel("shortcuts' support for selected")
+        ax_inh.set_ylabel("basal ganglias' support for selected")
+        # ax_exc legend position top right
+        ax_exc.legend(loc="upper right")
+        # equalize the axes ranges by first getting the current limits and then use the
+        # maximum of the absolute values
+        ax_exc_ylim = ax_exc.get_ylim()
+        ax_inh_ylim = ax_inh.get_ylim()
+        ax_exc.set_ylim(
+            min(ax_exc_ylim[0], ax_inh_ylim[0]),
+            max(ax_exc_ylim[1], ax_inh_ylim[1]),
+        )
+        ax_inh.set_ylim(
+            min(ax_exc_ylim[0], ax_inh_ylim[0]),
+            max(ax_exc_ylim[1], ax_inh_ylim[1]),
+        )
+
+        plt.tight_layout()
+        plt.savefig(
+            f"fig/__fig_support_for_selected_over_time_shortcut_{int(shortcut)}__.png",
+            dpi=300,
+        )
+        plt.close("all")
+    else:
+        # combine the dataframes to one
+        support_exc_df_dbs = support_exc_df.copy()
+        support_exc_df_dbs["support_type"] = "shortcut"
+        support_inh_df_dbs = support_inh_df.copy()
+        support_inh_df_dbs["support_type"] = "basal ganglia"
+        support_df_dbs = pd.concat([support_exc_df_dbs, support_inh_df_dbs])
+
+        # use seaborns relplot to plot the data with x="bin", y="support",
+        # hue="support_type", col="dbs_state"
+        plt.figure(figsize=(15, 10))
+        sns.relplot(
+            x="bin",
+            y="support",
+            hue="support_type",
+            col="dbs_state",
+            kind="line",
+            data=support_df_dbs,
+            palette={"shortcut": "red", "basal ganglia": "blue"},
+        )
+        plt.savefig(
+            f"fig/__fig_support_for_0_over_time_shortcut_{int(shortcut)}__.png", dpi=300
+        )
+        plt.close("all")
+        return
+
+    # run linear mixed effect model for each bin of support_exc_df and support_inh_df
+    # fixed effect for dbs_state compared to baseline (dbs-off)
+    for support_df_id, support_df in enumerate([support_exc_df, support_inh_df]):
+        for bin in support_df["bin"].unique():
+            data_df = support_df.copy()
+            data_df = data_df[data_df["bin"] == bin]
+            data_df["dbs_state"] = data_df["dbs_state"].astype("category")
+            data_df["bin"] = data_df["bin"].astype("category")
+            model = smf.mixedlm(
+                "support ~ C(dbs_state, Treatment('dbs-off'))",
+                data_df,
+                groups=data_df["subject"],
+            )
+            result = model.fit()
+
+            # save results
+            with open(
+                f"statistic/support_{['exc', 'inh'][support_df_id]}_difference_dbs_on_off_shortcut_{int(shortcut)}_bin_{bin}.txt",
+                "w",
+            ) as fh:
+                fh.write(result.summary().as_text())
 
 
 #################################################################################################################
@@ -3123,7 +3152,8 @@ if __name__ == "__main__":
         shortcut_on_off(True, 14)
 
     if __fig_dbs_on_off_14_and_100__:
-        dbs_on_off_14_and_100(True)
+        dbs_on_off_14_and_100(shortcut=True)
+        dbs_on_off_14_and_100(shortcut=False)
 
     if __fig_activity_changes_dbs_on__:
         activity_changes_dbs_on()
@@ -3150,4 +3180,8 @@ if __name__ == "__main__":
         weights_over_time()
 
     if __fig_support_over_time__:
-        support_over_time()
+        # analyze support for selected action for plastic and fixed shortcut
+        support_over_time(shortcut=True)
+        support_over_time(shortcut=False)
+        # plot support for "action 0" for plastic shortcut
+        support_over_time(shortcut=True, for_selected=False)
