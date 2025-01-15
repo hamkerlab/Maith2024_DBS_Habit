@@ -1861,4 +1861,4 @@ if __name__ == "__main__":
             f.write("\n\nCoefficients for all 'features':")
             f.write(str(res.summary()))
             f.write("\n\nMV Contrast Tests:\n")
-            f.write(str(mvt_contrasts.summary_frame))
+            f.write(str(mvt_contrasts.summary()))
