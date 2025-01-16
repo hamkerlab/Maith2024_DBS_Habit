@@ -581,7 +581,7 @@ def load_experimental_data(
         dbs_state (str):
             "ON" or "OFF"
         dbs_variant (str):
-            "off", "suppression", "efferent", "afferent", "passing", or "dbs-all"
+            "off", "suppression", "efferent", "afferent", "passing", or "dbs-comb"
 
     Returns:
         pd.DataFrame:
@@ -640,7 +640,7 @@ def load_experimental_data(
                 "efferent": 2,
                 "afferent": 3,
                 "passing": 4,
-                "dbs-all": 5,
+                "dbs-comb": 5,
             }[dbs_variant]
         file_name = (
             lambda sim_id: f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut_load}_DBS_State{dbs_load}_sim{sim_id}.pkl"
@@ -1137,15 +1137,16 @@ def estimate_p_explore_process_subject(
     qs_std = np.std(np.array(qs_list), axis=0)
 
     az.style.use("default")
+    labelsize = 9
     # create a figure plotting the q values of both actions through time
     # adding points for the selected actions on the lines of the q values
-    plt.figure()
+    plt.figure(figsize=(4, 3))
     # fill the area between the standard deviations of the q values
     plt.fill_between(
         range(len(actions)),
         qs_avg[:, 0] - qs_std[:, 0],
         qs_avg[:, 0] + qs_std[:, 0],
-        color="r",
+        color=(0.8, 0, 0),
         alpha=0.3,
         edgecolor=None,
         zorder=1,
@@ -1154,14 +1155,14 @@ def estimate_p_explore_process_subject(
         range(len(actions)),
         qs_avg[:, 1] - qs_std[:, 1],
         qs_avg[:, 1] + qs_std[:, 1],
-        color="b",
+        color=(0, 0, 0.65),
         alpha=0.3,
         edgecolor=None,
         zorder=1,
     )
     # plot the q values of both actions as lines
-    plt.plot(range(len(actions)), qs_avg[:, 0], color="r", zorder=2)
-    plt.plot(range(len(actions)), qs_avg[:, 1], color="b", zorder=2)
+    plt.plot(range(len(actions)), qs_avg[:, 0], color=(0.8, 0, 0, 0.7), zorder=2)
+    plt.plot(range(len(actions)), qs_avg[:, 1], color=(0, 0, 0.65, 0.7), zorder=2)
     # plot the selected actions on the lines of the q values
     plt.scatter(
         np.arange(len(actions)),
@@ -1176,6 +1177,7 @@ def estimate_p_explore_process_subject(
             for i in range(len(actions))
         ],
         edgecolors="k",
+        s=18,
         zorder=3,
     )
     # plot vertical lines for session changes
@@ -1196,8 +1198,13 @@ def estimate_p_explore_process_subject(
             for ses_id in [0, 1, 2]
         ],
         [f"Session {ses}" for ses in [1, 2, 3]],
+        fontweight="bold",
+        fontsize=labelsize,  
     )
     plt.xlim(session_borders[0], session_borders[-1])
+    
+    # settings y ticks
+    plt.tick_params(axis='y', labelsize=labelsize)
 
     # calculate the percentage of time the patient explores (selecting action with
     # lower q value) for each session and write it as text above the x axis,
@@ -1215,12 +1222,24 @@ def estimate_p_explore_process_subject(
             plt.gca().get_ylim()[0]
             + 0.01 * (plt.gca().get_ylim()[1] - plt.gca().get_ylim()[0]),
             f"P(Explore)={round(p_explore[ses_id], 2)}",
+            fontsize = labelsize,
             ha="center",
             va="bottom",
         )
-    plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
+    
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )    
+    
+    #plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
     plt.savefig(
         f"{save_folder}/q_values_{inference}_subject_{subject_idx}_dbs_{dbs}.png",
+        dpi=300,
+    )
+    plt.savefig(
+        f"{save_folder}/q_values_{inference}_subject_{subject_idx}_dbs_{dbs}.svg", format="svg", transparent=True,
         dpi=300,
     )
     plt.close()
@@ -1320,7 +1339,7 @@ if __name__ == "__main__":
         or sys.argv[1] == "double"
         or sys.argv[1] == "suppression"
         or sys.argv[1] == "efferent"
-        or sys.argv[1] == "dbs-all"
+        or sys.argv[1] == "dbs-comb"
     ):
         # load patient data
         data_off = load_experimental_data(
@@ -1351,7 +1370,7 @@ if __name__ == "__main__":
     if (
         sys.argv[1] == "suppression"
         or sys.argv[1] == "efferent"
-        or sys.argv[1] == "dbs-all"
+        or sys.argv[1] == "dbs-comb"
     ):
         #  load simulation data
         data_off = load_experimental_data(
@@ -1373,7 +1392,7 @@ if __name__ == "__main__":
         or sys.argv[1] == "double"
         or sys.argv[1] == "suppression"
         or sys.argv[1] == "efferent"
-        or sys.argv[1] == "dbs-all"
+        or sys.argv[1] == "dbs-comb"
     ):
 
         # set the number of subjects to use
@@ -1472,7 +1491,7 @@ if __name__ == "__main__":
         sys.argv[1] == "double"
         or sys.argv[1] == "suppression"
         or sys.argv[1] == "efferent"
-        or sys.argv[1] == "dbs-all"
+        or sys.argv[1] == "dbs-comb"
     ):
         with pm.Model(coords=coords) as m_bernoulli_double:
             # observed data
@@ -1565,8 +1584,8 @@ if __name__ == "__main__":
     # estimate the probability of exploration of the patients
     elif sys.argv[1] == "get_explore":
         # get the p explore data
-        inference_types = ["double", "suppression", "efferent", "dbs-all"]
-        # inference_types = ["double"]  # TODO remove
+        inference_types = ["double", "suppression", "efferent", "dbs-comb"]
+        #inference_types = ["double"]  # TODO remove
         for inference in inference_types:
             if inference == "double":
                 # load patient data
@@ -1585,7 +1604,7 @@ if __name__ == "__main__":
             elif (
                 inference == "suppression"
                 or inference == "efferent"
-                or inference == "dbs-all"
+                or inference == "dbs-comb"
             ):
                 #  load simulation data
                 data_off = load_experimental_data(
@@ -1612,7 +1631,7 @@ if __name__ == "__main__":
         # empty dataframe to store the p explore data
         p_explore_data_all = None
 
-        for inference in ["double", "suppression", "efferent", "dbs-all"]:
+        for inference in ["double", "suppression", "efferent", "dbs-comb"]:
             # load the p explore data
             p_explore_data = pd.read_json(
                 f"{save_folder[:-len(sys.argv[1])]}get_explore/p_explore_{inference}.json",
@@ -1634,43 +1653,83 @@ if __name__ == "__main__":
         # FIRST: ANOVA (inference, dbs) for each session
         # loop over sessions and create boxplots over inference types and ANOVAs with
         # factors dbs and inference type
-        for session in [1, 2, 3]:
+        az.style.use("default")
+        fig, axes = plt.subplots(3, 1, figsize=(4, 6), sharex=True)
 
-            # filter p_explore_data to only include the current session
-            p_explore_data = p_explore_data_all[
-                p_explore_data_all["session"] == session
-            ]
+        # Plot configuration
+        letters = ["A", "B", "C"]
+        palette = {"ON": (0.8, 0, 0, 0.7), "OFF": (0, 0, 0.65)}
+        labelsize = 9
 
-            # plot the p explore data as boxplots with factors dbs and inference using seaborn
-            az.style.use("default")
-            plt.figure(figsize=(10, 6))
+        for idx, session in enumerate([1, 2, 3]):
+            # Filter p_explore_data to only include the current session
+            p_explore_data = p_explore_data_all[p_explore_data_all["session"] == session]
+                     
+            # Plot on the corresponding axis
             sns.boxplot(
                 x="inference",
                 y="p_explore",
                 hue="dbs",
                 data=p_explore_data,
-                palette={"ON": "red", "OFF": "blue"},
+                palette=palette,
                 showmeans=True,
                 meanprops={
                     # "marker": "o",
                     "markerfacecolor": "black",
                     "markeredgecolor": "white",
-                    # "markersize": 8,
+                    "markersize": 4
                 },
                 linecolor="black",
+                flierprops={
+                    "markersize": 4               
+                },
+                ax=axes[idx],
+            )
+            
+            # Label the subplots
+            # axes[idx].set_title(f"{letters[idx]}) Session {session}", loc="left", fontweight="bold")
+            axes[idx].set_ylim(top=0.7) 
+            
+            if idx == 0:
+                axes[idx].legend(title="DBS State", fontsize=labelsize, loc="upper right")
+            else:
+                axes[idx].get_legend().remove()  # Remove legend for subplots 2 and 3  
+                           
+            if idx == 2:
+                axes[idx].set_xlabel("Inference Type", fontweight="bold", fontsize=labelsize)
+                # Customize x-axis labels
+                axes[idx].set_xticklabels(
+                    ["double", "supression", "efferent", "dbs-comb"], 
+                    fontsize=labelsize  # Adjust font size here
+                )
+              
+            axes[idx].set_ylabel(f"P(Explore) Session {idx+1}", fontweight="bold", fontsize=labelsize)
+            axes[idx].tick_params(axis='y', labelsize=labelsize)
+                   
+        # Adjust spacing between subplots
+        plt.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=1.08,
             )
 
-            plt.title(f"P(Explore) Session {session}")
-            plt.xlabel("Inference Type")
-            plt.ylabel("P(Explore)")
-            plt.legend(title="DBS State", loc="upper left")
-            plt.tight_layout()
-            plt.savefig(f"{save_folder}/p_explore_boxplot_session_{session}.png")
-            plt.close()
+        # Add plot labels
+        plt.text(0.025, 0.985, "A", transform=plt.gcf().transFigure, fontsize=9)
+        plt.text(0.025, 0.665, "B", transform=plt.gcf().transFigure, fontsize=9)
+        plt.text(0.025, 0.345, "C", transform=plt.gcf().transFigure, fontsize=9)
 
+        # Save the combined plot
+        plt.savefig(f"{save_folder}/p_explore_boxplots_combined.png", dpi=300)
+        plt.savefig(f"{save_folder}/p_explore_boxplots_combined.svg", dpi=300, format="svg", transparent=True)
+        plt.savefig("fig/p_explore_boxplots_combined.png", dpi=300)
+        plt.savefig("fig/p_explore_boxplots_combined.svg", dpi=300, format="svg", transparent=True)
+        plt.close()
+
+
+        for idx, session in enumerate([1, 2, 3]):
             # pingouin needs different subject ids for different between groups
             for inference_id, inference in enumerate(
-                ["double", "suppression", "efferent", "dbs-all"]
+                ["double", "suppression", "efferent", "dbs-comb"]
             ):
                 p_explore_data.loc[
                     p_explore_data["inference"] == inference, "subject"
@@ -1689,9 +1748,9 @@ if __name__ == "__main__":
             aov.to_csv(
                 f"{save_folder}/p_explore_anova_session_{session}.csv", index=False
             )
-
+            
         # SECOND: how similar with average distances
-        # analyze for dbs variant (suppression, efferent, dbs-all) the p explore data
+        # analyze for dbs variant (suppression, efferent, dbs-comb) the p explore data
         # has the highest similarity to the patient data (double)
 
         # for each inference type create an array  with shape (n_subjects, 3*2)
@@ -1704,7 +1763,7 @@ if __name__ == "__main__":
         ]
         p_explore_mv_dict = {name: [] for name in mv_names}
         p_explore_mv_dict["group"] = []
-        for inference in ["double", "suppression", "efferent", "dbs-all"]:
+        for inference in ["double", "suppression", "efferent", "dbs-comb"]:
 
             # filter p_explore_data to only include the current inference type
             p_explore_data = p_explore_data_all[
@@ -1767,7 +1826,7 @@ if __name__ == "__main__":
         # colors
         diffs_df = pd.DataFrame(
             {
-                "inference": np.repeat(["suppression", "efferent", "dbs-all"], 6 * 2),
+                "inference": np.repeat(["suppression", "efferent", "dbs-comb"], 6 * 2),
                 "feature": np.tile(
                     np.concatenate(
                         [
@@ -1795,26 +1854,41 @@ if __name__ == "__main__":
                     [
                         diffs_separrated_dict["suppression"],
                         diffs_separrated_dict["efferent"],
-                        diffs_separrated_dict["dbs-all"],
+                        diffs_separrated_dict["dbs-comb"],
                     ]
                 ),
             }
         )
 
+        labelsize = 9
+        
         az.style.use("default")
-        plt.figure(figsize=(20, 6))
+        plt.figure(figsize=(10, 4))
         sns.barplot(
             x="feature",
             y="diff",
             hue="inference",
             data=diffs_df,
-            palette={"suppression": "green", "efferent": "red", "dbs-all": "purple"},
+            palette={"suppression": (1, 0.7, 0.7, 0.8),
+                     "efferent": (1, 0.5, 0.5, 0.8),
+                     "dbs-comb": (0.8, 0, 0, 0.8),
+                    },
         )
-        plt.title("P(Explore) Differences")
-        plt.xlabel("Feature")
-        plt.ylabel("Difference")
-        plt.tight_layout()
-        plt.savefig(f"{save_folder}/p_explore_diffs.png")
+        #plt.title("P(Explore) Differences")
+        plt.tick_params(axis='both', labelsize=labelsize)
+        plt.xlabel("Feature", fontweight="bold", fontsize=labelsize)
+        plt.ylabel("Difference to DBS-OFF", fontweight="bold", fontsize=labelsize)
+        plt.legend(title="inference", fontsize=labelsize, loc="upper right")
+        plt.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=1.08,
+        )
+        
+        plt.savefig(f"{save_folder}/p_explore_diffs.png", dpi=300)
+        plt.savefig(f"{save_folder}/p_explore_diffs.svg",format="svg",transparent=True, dpi=300)
+        plt.savefig("fig/p_explore_diffs.png", dpi=300)
+        plt.savefig("fig/p_explore_diffs.svg",format="svg",transparent=True, dpi=300)
         plt.close()
 
         # print the differences from norms_dict in a text file
@@ -1835,7 +1909,7 @@ if __name__ == "__main__":
         # baseline=double) predicting the p explore values
         formula = " + ".join(mv_names)
         formula += (
-            " ~ C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])"
+            " ~ C(group, levels=['double', 'suppression', 'efferent', 'dbs-comb'])"
         )
         mod = MultivariateLS.from_formula(formula, data=p_explore_mv_df)
         res = mod.fit()
@@ -1846,12 +1920,12 @@ if __name__ == "__main__":
                 (
                     f"{group1}_vs_{group2}",
                     [
-                        f"C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])[T.{group1}] - C(group, levels=['double', 'suppression', 'efferent', 'dbs-all'])[T.{group2}]"
+                        f"C(group, levels=['double', 'suppression', 'efferent', 'dbs-comb'])[T.{group1}] - C(group, levels=['double', 'suppression', 'efferent', 'dbs-comb'])[T.{group2}]"
                     ],
                     mv_names,
                 )
                 for group1, group2 in itertools.combinations(
-                    ["suppression", "efferent", "dbs-all"], 2
+                    ["suppression", "efferent", "dbs-comb"], 2
                 )
             ]
         )

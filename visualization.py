@@ -34,10 +34,12 @@ __fig_support_over_time__ = False
 min_y_reward = 0
 max_y_reward = 30
 
-min_y_habit = 4
+min_y_habit = 0
 max_y_habit = 30
 
 label_size = 9
+
+lighter_darkblue = (0, 0, 0.65)
 
 #################################################################################################################
 ##################################### __fig_shortcut_on_off__ ###################################################
@@ -115,7 +117,7 @@ def shortcut_on_off(switch, number_of_simulations):
     width = 0.3
 
     # bar colors
-    colors = ["darkblue", "steelblue", "lightblue"]
+    colors = [lighter_darkblue, "steelblue", "lightblue"]
 
     # bar positions
     positions = [x - 1.3 * width, x, x + 1.3 * width]
@@ -163,7 +165,7 @@ def shortcut_on_off(switch, number_of_simulations):
             patch.set_edgecolor("black")
 
     # legend
-    ax.legend(fontsize="small")
+    ax.legend(fontsize=label_size)  # small
 
     ################################################### significance * #############################################
 
@@ -194,17 +196,25 @@ def shortcut_on_off(switch, number_of_simulations):
     else:
         plt.ylabel("rewards", fontweight="bold", fontsize=label_size)
 
+    plt.tick_params(axis="both", labelsize=label_size)
+
     # y-axis min/max
     if switch:
         plt.ylim(min_y_habit, max_y_habit)
     else:
         plt.ylim(min_y_reward, max_y_reward)
 
-    plt.tight_layout()
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
 
     # save fig
     plt.savefig("fig/__fig_shortcut_on_off__.png", dpi=300)
-    plt.savefig("fig/__fig_shortcut_on_off__.svg", format="svg", dpi=300)
+    plt.savefig(
+        "fig/__fig_shortcut_on_off__.svg", format="svg", transparent=True, dpi=300
+    )
 
     plt.close("all")
 
@@ -248,7 +258,7 @@ def shortcut_on_off_line(number_of_simulations):
     x_values = np.arange(0, 120, 5)
 
     # bar colors
-    colors = ["darkblue", "steelblue", "lightblue"]
+    colors = [lighter_darkblue, "steelblue", "lightblue"]
 
     labels = ["DBS OFF Patients", "Model Plastic Shortcut", "Model Fixed Shortcut"]
 
@@ -277,7 +287,7 @@ def shortcut_on_off_line(number_of_simulations):
     )
 
     # plot legend
-    plt.legend(fontsize="small")
+    plt.legend(fontsize=label_size)  # small
 
     # x-axis
     plt.xticks(range(0, 121, 20))
@@ -286,7 +296,7 @@ def shortcut_on_off_line(number_of_simulations):
     # intervall-labels
     plt.text(
         20,
-        -1,
+        -0.8,
         "Session1",
         ha="center",
         va="center",
@@ -296,7 +306,7 @@ def shortcut_on_off_line(number_of_simulations):
     )
     plt.text(
         60,
-        -1,
+        -0.8,
         "Session2",
         ha="center",
         va="center",
@@ -306,7 +316,7 @@ def shortcut_on_off_line(number_of_simulations):
     )
     plt.text(
         100,
-        -1,
+        -0.8,
         "Session3",
         ha="center",
         va="center",
@@ -319,12 +329,20 @@ def shortcut_on_off_line(number_of_simulations):
     plt.ylim(0, 7)
     plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
 
+    plt.tick_params(axis="both", labelsize=label_size)
+
     # plt.ylim(0, 6)
-    plt.tight_layout()
+    plt.tight_layout(
+        pad=0.1,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
 
     # save fig
     plt.savefig("fig/__fig_shortcut_on_off_line__.png", dpi=300)
-    plt.savefig("fig/__fig_shortcut_on_off_line__.svg", format="svg", dpi=300)
+    plt.savefig(
+        "fig/__fig_shortcut_on_off_line__.svg", format="svg", transparent=True, dpi=300
+    )
 
     plt.close("all")
 
@@ -503,13 +521,13 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     width = 0.2
 
     # bar colors
-    patient_colors = [(0.8, 0, 0, 0.7), "darkblue"]
+    patient_colors = [(0.8, 0, 0, 0.7), lighter_darkblue]
     simulation_colors = [
         (1, 0.7, 0.7, 0.8),  # very bright red
         (1, 0.5, 0.5, 0.8),  # light red
         (1, 0.3, 0.3, 0.8),  # red
         (0.8, 0, 0, 0.8),  # dark red
-        "darkblue",
+        lighter_darkblue,
     ]
 
     # bar positions
@@ -578,7 +596,7 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
         bp["boxes"][0].set_label(patient_labels[i])
 
     # plot legend
-    ax1.legend(fontsize="x-small", loc="upper left")
+    ax1.legend(fontsize=label_size, loc="upper left")  # x-small
 
     # ax1.set_xlabel("session")
     ax1.set_ylim(0, 41)
@@ -631,7 +649,7 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
             bp["boxes"][0].set_label(simulation_labels[i])
 
     # plot legend
-    ax2.legend(fontsize="x-small", loc="upper left")
+    ax2.legend(fontsize=label_size, loc="upper left")  # x-small
     ax2.set_ylim(0, 41)
     if switch:
         ax2.set_ylabel("unrewarded\ndecisions", fontweight="bold", fontsize=label_size)
@@ -719,12 +737,18 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     ax2.set_xlim(ax3.get_xlim())
     ax3.set_xlim(ax1.get_xlim())
 
-    plt.tight_layout
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
 
     # plot labels
-    plt.text(0.01, 0.89, "A", transform=plt.gcf().transFigure, fontsize=11)
-    plt.text(0.01, 0.62, "B", transform=plt.gcf().transFigure, fontsize=11)
-    plt.text(0.01, 0.35, "C", transform=plt.gcf().transFigure, fontsize=11)
+    plt.text(0.01, 0.98, "A", transform=plt.gcf().transFigure, fontsize=11)
+    plt.text(0.01, 0.655, "B", transform=plt.gcf().transFigure, fontsize=11)
+    plt.text(0.01, 0.33, "C", transform=plt.gcf().transFigure, fontsize=11)
+
+    plt.tick_params(axis="both", labelsize=label_size)
 
     # save fig
     plt.savefig(
@@ -1292,18 +1316,30 @@ def activity_changes_dbs_on():
         # Adjust layout to minimize margins
         # plt.subplots_adjust(left=0.07, right=0.96, top=0.9, bottom=0.15, wspace=0.2)
 
-        plt.tight_layout()
+        plt.tick_params(axis="both", labelsize=label_size)
+
+        plt.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=1.08,
+        )
 
         # save fig
         if session == 0:
             plt.savefig("fig/__fig_activity_change_dbs_on_init__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_on_init__.svg", format="svg", dpi=300
+                "fig/__fig_activity_change_dbs_on_init__.svg",
+                format="svg",
+                transparent=True,
+                dpi=300,
             )
         else:
             plt.savefig("fig/__fig_activity_change_dbs_on_learn__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_on_learn__.svg", format="svg", dpi=300
+                "fig/__fig_activity_change_dbs_on_learn__.svg",
+                format="svg",
+                transparent=True,
+                dpi=300,
             )
 
         plt.close("all")
@@ -1357,7 +1393,7 @@ def activity_changes_dbs_off():
         # bar width
         width = 0.5
 
-        colors = ["darkblue"]  # [(0.2, 0.2, 1.0, 0.7)]
+        colors = [lighter_darkblue]  # [(0.2, 0.2, 1.0, 0.7)]
 
         # bar positions
         positions = [
@@ -1431,18 +1467,30 @@ def activity_changes_dbs_off():
         # axs.set_xticklabels([])
         axs.set_xlim(xlim_neg, xlim_pos)
 
-        plt.tight_layout()
+        plt.tick_params(axis="both", labelsize=label_size)
+
+        plt.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=1.08,
+        )
 
         # save fig
         if session == 0:
             plt.savefig("fig/__fig_activity_change_dbs_off_init__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_off_init__.svg", format="svg", dpi=300
+                "fig/__fig_activity_change_dbs_off_init__.svg",
+                format="svg",
+                transparent=True,
+                dpi=300,
             )
         else:
             plt.savefig("fig/__fig_activity_change_dbs_off_learn__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_off_learn__.svg", format="svg", dpi=300
+                "fig/__fig_activity_change_dbs_off_learn__.svg",
+                format="svg",
+                transparent=True,
+                dpi=300,
             )
 
         plt.close("all")
@@ -1531,15 +1579,21 @@ def gpi_scatter():
         [line],
         ["Patient Data Session 3"],
         loc="upper right",
-        fontsize="small",
+        fontsize=label_size,  # small
     )
 
     plt.ylim(14, 35)
     plt.xlim(-0.05, 0.6)
-    plt.tight_layout()
+    plt.tick_params(axis="both", labelsize=label_size)
+
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
 
     plt.savefig("fig/__fig_gpi_scatter__.png", dpi=300)
-    plt.savefig("fig/__fig_gpi_scatter__.svg", format="svg", dpi=300)
+    plt.savefig("fig/__fig_gpi_scatter__.svg", format="svg", transparent=True, dpi=300)
     plt.close("all")
 
 
@@ -1694,6 +1748,8 @@ def load_simulate():
         va="center",
     )
 
+    plt.tick_params(axis="both", labelsize=label_size)
+
     ################################################### significance * #############################################
 
     # function for significance over the boxplots
@@ -1733,16 +1789,22 @@ def load_simulate():
 
     #################################################### plot settings #############################################
 
-    plt.legend(handles=legend_bars, loc="upper left", fontsize="small")
+    plt.legend(handles=legend_bars, loc="upper left", fontsize=label_size)  # small
 
     # setting y-axis
     plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
-    plt.ylim(0, 45)
+    plt.ylim(0, 46)
 
-    plt.tight_layout()
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
 
     plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
-    plt.savefig("fig/__fig_load_simulate__.svg", format="svg", dpi=300)
+    plt.savefig(
+        "fig/__fig_load_simulate__.svg", format="svg", transparent=True, dpi=300
+    )
 
     plt.close("all")
 
@@ -1916,16 +1978,24 @@ def load_simulate_dbscomb():
         plt.bar(0, 0, color=colors[i], label=legend[i]) for i in range(len(colors))
     ]
 
-    plt.legend(handles=legend_bars, loc="upper left", fontsize="small")
+    plt.legend(handles=legend_bars, loc="upper left", fontsize=label_size)  # small
 
     # setting y-axis
     plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
-    plt.ylim(0, 45)
+    plt.ylim(0, 46)
 
-    plt.tight_layout()
+    plt.tick_params(axis="both", labelsize=label_size)
+
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
 
     plt.savefig("fig/__fig_load_simulate_dbscomb__.png", dpi=300)
-    plt.savefig("fig/__fig_load_simulate_dbscomb__.svg", format="svg", dpi=300)
+    plt.savefig(
+        "fig/__fig_load_simulate_dbscomb__.svg", format="svg", transparent=True, dpi=300
+    )
 
     plt.close("all")
 
@@ -2124,10 +2194,17 @@ def dbs_parameter():
 
         idx += 1
         plt.ylim(0.5, 1.4)
+        plt.tick_params(axis="both", labelsize=label_size)
 
-    plt.tight_layout()
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
     plt.savefig("fig/__fig_dbs_parameter__.png", dpi=300)
-    plt.savefig("fig/__fig_dbs_parameter__.svg", format="svg", dpi=300)
+    plt.savefig(
+        "fig/__fig_dbs_parameter__.svg", format="svg", transparent=True, dpi=300
+    )
     plt.close("all")
 
 
@@ -2364,9 +2441,20 @@ def parameter_gpi_inhib():
 
         idx += 1
 
-    plt.tight_layout()
+    plt.tick_params(axis="both", labelsize=label_size)
+
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+    )
     plt.savefig("fig/__appendix_fig_parameter_gpi_inhib__.png", dpi=300)
-    plt.savefig("fig/__appendix_fig_parameter_gpi_inhib__.svg", format="svg", dpi=300)
+    plt.savefig(
+        "fig/__appendix_fig_parameter_gpi_inhib__.svg",
+        format="svg",
+        transparent=True,
+        dpi=300,
+    )
     plt.close("all")
 
 
