@@ -1204,7 +1204,7 @@ def estimate_p_explore_process_subject(
     plt.xlim(session_borders[0], session_borders[-1])
     
     # settings y ticks
-    plt.tick_params(axis='y', labelsize=labelsize)
+    plt.tick_params(axis='both', labelsize=labelsize)
 
     # calculate the percentage of time the patient explores (selecting action with
     # lower q value) for each session and write it as text above the x axis,
@@ -1227,11 +1227,13 @@ def estimate_p_explore_process_subject(
             va="bottom",
         )
     
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
-    )    
+        rect=[0, -0.008, 1, 1],
+    ) 
     
     #plt.title(f"Subject {subject_idx} DBS {['OFF', 'ON'][dbs]}")
     plt.savefig(
@@ -1239,7 +1241,7 @@ def estimate_p_explore_process_subject(
         dpi=300,
     )
     plt.savefig(
-        f"{save_folder}/q_values_{inference}_subject_{subject_idx}_dbs_{dbs}.svg", format="svg", transparent=True,
+        f"{save_folder}/q_values_{inference}_subject_{subject_idx}_dbs_{dbs}.pdf", format="pdf",
         dpi=300,
     )
     plt.close()
@@ -1657,7 +1659,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(3, 1, figsize=(4, 6), sharex=True)
 
         # Plot configuration
-        letters = ["A", "B", "C"]
+        #letters = ["A", "B", "C"]
         palette = {"ON": (0.8, 0, 0, 0.7), "OFF": (0, 0, 0.65)}
         labelsize = 9
 
@@ -1691,38 +1693,43 @@ if __name__ == "__main__":
             axes[idx].set_ylim(top=0.7) 
             
             if idx == 0:
-                axes[idx].legend(title="DBS State", fontsize=labelsize, loc="upper right")
+                handles, labels = axes[idx].get_legend_handles_labels()
+                new_labels = ["dbs-on", "dbs-off"]
+                axes[idx].legend(
+                    handles, new_labels, fontsize=labelsize, loc="upper right"
+                )
             else:
                 axes[idx].get_legend().remove()  # Remove legend for subplots 2 and 3  
                            
             if idx == 2:
-                axes[idx].set_xlabel("Inference Type", fontweight="bold", fontsize=labelsize)
+                axes[idx].set_xlabel("Inference Data", fontweight="bold", fontsize=labelsize)
                 # Customize x-axis labels
                 axes[idx].set_xticklabels(
-                    ["double", "supression", "efferent", "dbs-comb"], 
+                    ["patients", "supression", "efferent", "dbs-comb"], 
                     fontsize=labelsize  # Adjust font size here
                 )
               
-            axes[idx].set_ylabel(f"P(Explore) Session {idx+1}", fontweight="bold", fontsize=labelsize)
-            axes[idx].tick_params(axis='y', labelsize=labelsize)
+            axes[idx].set_ylabel(f"P(Explore)", fontweight="bold", fontsize=labelsize)
+            axes[idx].tick_params(axis='both', labelsize=labelsize)
                    
-        # Adjust spacing between subplots
+        # Adjust layout
         plt.tight_layout(
             pad=0,
             h_pad=1.08,
             w_pad=1.08,
-            )
+            rect=[-0.002, -0.006, 1, 1],
+        )
 
         # Add plot labels
-        plt.text(0.025, 0.985, "A", transform=plt.gcf().transFigure, fontsize=9)
-        plt.text(0.025, 0.665, "B", transform=plt.gcf().transFigure, fontsize=9)
-        plt.text(0.025, 0.345, "C", transform=plt.gcf().transFigure, fontsize=9)
+        plt.text(0.005, 0.98, "A", transform=plt.gcf().transFigure, fontsize=11)
+        plt.text(0.005, 0.66, "B", transform=plt.gcf().transFigure, fontsize=11)
+        plt.text(0.005, 0.34, "C", transform=plt.gcf().transFigure, fontsize=11)
 
         # Save the combined plot
         plt.savefig(f"{save_folder}/p_explore_boxplots_combined.png", dpi=300)
-        plt.savefig(f"{save_folder}/p_explore_boxplots_combined.svg", dpi=300, format="svg", transparent=True)
+        plt.savefig(f"{save_folder}/p_explore_boxplots_combined.pdf", format="pdf", dpi=300)
         plt.savefig("fig/p_explore_boxplots_combined.png", dpi=300)
-        plt.savefig("fig/p_explore_boxplots_combined.svg", dpi=300, format="svg", transparent=True)
+        plt.savefig("fig/p_explore_boxplots_combined.pdf", format="pdf", dpi=300)
         plt.close()
 
 
@@ -1863,7 +1870,7 @@ if __name__ == "__main__":
         labelsize = 9
         
         az.style.use("default")
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(6, 3))
         sns.barplot(
             x="feature",
             y="diff",
@@ -1875,20 +1882,25 @@ if __name__ == "__main__":
                     },
         )
         #plt.title("P(Explore) Differences")
+        plt.axhline(y=0, color='black', linestyle='-', linewidth=0.7)
         plt.tick_params(axis='both', labelsize=labelsize)
         plt.xlabel("Feature", fontweight="bold", fontsize=labelsize)
+        plt.xticks(rotation=45)
         plt.ylabel("Difference to DBS-OFF", fontweight="bold", fontsize=labelsize)
-        plt.legend(title="inference", fontsize=labelsize, loc="upper right")
+        plt.legend(fontsize=labelsize, loc="upper left")
+        
+        # Adjust layout
         plt.tight_layout(
             pad=0,
             h_pad=1.08,
             w_pad=1.08,
+            rect=[-0.001, -0.012, 1.007, 1],
         )
         
         plt.savefig(f"{save_folder}/p_explore_diffs.png", dpi=300)
-        plt.savefig(f"{save_folder}/p_explore_diffs.svg",format="svg",transparent=True, dpi=300)
+        plt.savefig(f"{save_folder}/p_explore_diffs.pdf", format="pdf", dpi=300)
         plt.savefig("fig/p_explore_diffs.png", dpi=300)
-        plt.savefig("fig/p_explore_diffs.svg",format="svg",transparent=True, dpi=300)
+        plt.savefig("fig/p_explore_diffs.pdf", format="pdf", dpi=300)
         plt.close()
 
         # print the differences from norms_dict in a text file

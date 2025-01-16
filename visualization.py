@@ -13,17 +13,17 @@ from statsmodels.stats.multitest import multipletests
 ########################################### plot figures ########################################################
 #################################################################################################################
 
-__fig_shortcut_on_off_line__ = False
-__fig_shortcut_on_off__ = False
-__fig_dbs_on_off_14_and_100__ = False
-__fig_activity_changes_dbs_on__ = False
-__fig_activity_changes_dbs_off__ = False
-__fig_gpi_scatter__ = False
-__fig_load_simulate__ = False
-__fig_load_simulate_dbscomb__ = False
-__fig_dbs_parameter__ = False
-__fig_parameter_gpi_inhib__ = False
-__fig_weights_over_time__ = True
+__fig_shortcut_on_off_line__ = True
+__fig_shortcut_on_off__ = True
+__fig_dbs_on_off_14_and_100__ = True
+__fig_activity_changes_dbs_on__ = True
+__fig_activity_changes_dbs_off__ = True
+__fig_gpi_scatter__ = True
+__fig_load_simulate__ = True
+__fig_load_simulate_dbscomb__ = True
+__fig_dbs_parameter__ = True
+__fig_parameter_gpi_inhib__ = True
+__fig_weights_over_time__ = False
 __fig_support_over_time__ = False
 
 
@@ -186,6 +186,8 @@ def shortcut_on_off(switch, number_of_simulations):
 
     ################################################### axis settings ###############################################
 
+    ax.tick_params(axis="both", labelsize=label_size)
+
     # x-axis
     plt.xticks(x, sessions)
 
@@ -196,26 +198,23 @@ def shortcut_on_off(switch, number_of_simulations):
     else:
         plt.ylabel("rewards", fontweight="bold", fontsize=label_size)
 
-    plt.tick_params(axis="both", labelsize=label_size)
-
     # y-axis min/max
     if switch:
         plt.ylim(min_y_habit, max_y_habit)
     else:
         plt.ylim(min_y_reward, max_y_reward)
 
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[0, -0.009, 1, 1],
     )
 
     # save fig
     plt.savefig("fig/__fig_shortcut_on_off__.png", dpi=300)
-    plt.savefig(
-        "fig/__fig_shortcut_on_off__.svg", format="svg", transparent=True, dpi=300
-    )
-
+    plt.savefig("fig/__fig_shortcut_on_off__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
@@ -331,19 +330,17 @@ def shortcut_on_off_line(number_of_simulations):
 
     plt.tick_params(axis="both", labelsize=label_size)
 
-    # plt.ylim(0, 6)
+    # Adjust layout
     plt.tight_layout(
-        pad=0.1,
+        pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[0, 0.007, 1, 1],
     )
 
     # save fig
     plt.savefig("fig/__fig_shortcut_on_off_line__.png", dpi=300)
-    plt.savefig(
-        "fig/__fig_shortcut_on_off_line__.svg", format="svg", transparent=True, dpi=300
-    )
-
+    plt.savefig("fig/__fig_shortcut_on_off_line__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
@@ -600,6 +597,7 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
 
     # ax1.set_xlabel("session")
     ax1.set_ylim(0, 41)
+    ax1.tick_params(axis="both", which="major", labelsize=label_size)
     if switch:
         ax1.set_ylabel("unrewarded\ndecisions", fontweight="bold", fontsize=label_size)
     else:
@@ -651,6 +649,7 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     # plot legend
     ax2.legend(fontsize=label_size, loc="upper left")  # x-small
     ax2.set_ylim(0, 41)
+    ax2.tick_params(axis="both", which="major", labelsize=label_size)
     if switch:
         ax2.set_ylabel("unrewarded\ndecisions", fontweight="bold", fontsize=label_size)
     else:
@@ -699,6 +698,7 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     # settings axis
     ax3.set_xlabel("Session", fontweight="bold", fontsize=label_size)
     ax3.set_ylim(0, 41)
+    ax3.tick_params(axis="both", which="major", labelsize=label_size)
     if switch:
         ax3.set_ylabel("unrewarded\ndecisions", fontweight="bold", fontsize=label_size)
     else:
@@ -718,9 +718,10 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
         )
         ax.text((x1 + x2) / 2, y - 0.2, "*", fontsize=10, ha="center")
 
-    add_star(ax3, 4.3, 4.6, 34)
-    add_star(ax3, 3.7, 4.6, 36)
-    add_star(ax3, 3.4, 4.6, 38)
+    if shortcut == 1:
+        add_star(ax3, 4.3, 4.6, 34)
+        add_star(ax3, 3.7, 4.6, 36)
+        add_star(ax3, 3.4, 4.6, 38)
 
     ################################################### axis settings ###############################################
 
@@ -737,10 +738,12 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     ax2.set_xlim(ax3.get_xlim())
     ax3.set_xlim(ax1.get_xlim())
 
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[-0.004, -0.004, 1, 1],
     )
 
     # plot labels
@@ -748,18 +751,15 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     plt.text(0.01, 0.655, "B", transform=plt.gcf().transFigure, fontsize=11)
     plt.text(0.01, 0.33, "C", transform=plt.gcf().transFigure, fontsize=11)
 
-    plt.tick_params(axis="both", labelsize=label_size)
-
     # save fig
     plt.savefig(
         f"fig/__fig_dbs_on_off_14_and_100_Shortcut{int(shortcut)}__.png", dpi=300
     )
     plt.savefig(
-        f"fig/__fig_dbs_on_off_14_and_100_Shortcut{int(shortcut)}__.svg",
-        format="svg",
+        f"fig/__fig_dbs_on_off_14_and_100_Shortcut{int(shortcut)}__.pdf",
+        format="pdf",
         dpi=300,
     )
-
     plt.close("all")
 
 
@@ -1084,6 +1084,8 @@ def activity_changes_dbs_on():
         axs[1].set_xticks(np.linspace(xlim_neg, xlim_pos, 5))
         axs[1].set_xticklabels([""] * 5)  # Entferne die Labels
 
+        axs[1].tick_params(axis="both", labelsize=label_size)
+
         # title
         axs[1].set_title("efferent", fontweight="bold", fontsize=label_size)
 
@@ -1148,6 +1150,8 @@ def activity_changes_dbs_on():
         axs[2].set_xlim(xlim_neg, xlim_pos)
         axs[2].set_xticks(np.linspace(xlim_neg, xlim_pos, 5))
         axs[2].set_xticklabels([""] * 5)  # Entferne die Labels
+
+        axs[2].tick_params(axis="both", labelsize=label_size)
 
         # title
         axs[2].set_title("afferent", fontweight="bold", fontsize=label_size)
@@ -1219,6 +1223,8 @@ def activity_changes_dbs_on():
         axs[3].set_xticks(np.linspace(xlim_neg, xlim_pos, 5))
         axs[3].set_xticklabels([""] * 5)  # Entferne die Labels
 
+        axs[3].tick_params(axis="both", labelsize=label_size)
+
         # title
         axs[3].set_title("passing-fibres", fontweight="bold", fontsize=label_size)
 
@@ -1281,6 +1287,8 @@ def activity_changes_dbs_on():
         axs[4].set_xticks(np.linspace(xlim_neg, xlim_pos, 5))
         axs[4].set_xticklabels([""] * 5)  # Entferne die Labels
 
+        axs[4].tick_params(axis="both", labelsize=label_size)
+
         # title
         axs[4].set_title("dbs-comb", fontweight="bold", fontsize=label_size)
 
@@ -1316,30 +1324,24 @@ def activity_changes_dbs_on():
         # Adjust layout to minimize margins
         # plt.subplots_adjust(left=0.07, right=0.96, top=0.9, bottom=0.15, wspace=0.2)
 
-        plt.tick_params(axis="both", labelsize=label_size)
-
+        # Adjust layout
         plt.tight_layout(
             pad=0,
             h_pad=1.08,
             w_pad=1.08,
+            rect=[-0.002, -0.02, 1, 1],
         )
 
         # save fig
         if session == 0:
             plt.savefig("fig/__fig_activity_change_dbs_on_init__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_on_init__.svg",
-                format="svg",
-                transparent=True,
-                dpi=300,
+                "fig/__fig_activity_change_dbs_on_init__.pdf", format="pdf", dpi=300
             )
         else:
             plt.savefig("fig/__fig_activity_change_dbs_on_learn__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_on_learn__.svg",
-                format="svg",
-                transparent=True,
-                dpi=300,
+                "fig/__fig_activity_change_dbs_on_learn__.pdf", format="pdf", dpi=300
             )
 
         plt.close("all")
@@ -1467,30 +1469,26 @@ def activity_changes_dbs_off():
         # axs.set_xticklabels([])
         axs.set_xlim(xlim_neg, xlim_pos)
 
-        plt.tick_params(axis="both", labelsize=label_size)
+        axs.tick_params(axis="both", labelsize=label_size)
 
+        # Adjust layout
         plt.tight_layout(
             pad=0,
             h_pad=1.08,
             w_pad=1.08,
+            rect=[-0.004, -0.006, 1, 1],
         )
 
         # save fig
         if session == 0:
             plt.savefig("fig/__fig_activity_change_dbs_off_init__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_off_init__.svg",
-                format="svg",
-                transparent=True,
-                dpi=300,
+                "fig/__fig_activity_change_dbs_off_init__.pdf", format="pdf", dpi=300
             )
         else:
             plt.savefig("fig/__fig_activity_change_dbs_off_learn__.png", dpi=300)
             plt.savefig(
-                "fig/__fig_activity_change_dbs_off_learn__.svg",
-                format="svg",
-                transparent=True,
-                dpi=300,
+                "fig/__fig_activity_change_dbs_off_learn__.pdf", format="pdf", dpi=300
             )
 
         plt.close("all")
@@ -1586,14 +1584,16 @@ def gpi_scatter():
     plt.xlim(-0.05, 0.6)
     plt.tick_params(axis="both", labelsize=label_size)
 
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[-0.001, -0.005, 1, 1],
     )
 
     plt.savefig("fig/__fig_gpi_scatter__.png", dpi=300)
-    plt.savefig("fig/__fig_gpi_scatter__.svg", format="svg", transparent=True, dpi=300)
+    plt.savefig("fig/__fig_gpi_scatter__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
@@ -1741,9 +1741,9 @@ def load_simulate():
     plt.xticks(x, session)
     plt.text(
         -0.8,
-        -4.5,
+        -4.0,
         "acute\n  history",
-        fontsize=10,
+        fontsize=label_size,
         ha="center",
         va="center",
     )
@@ -1795,17 +1795,16 @@ def load_simulate():
     plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
     plt.ylim(0, 46)
 
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[-0.006, -0.004, 1, 1],
     )
 
     plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
-    plt.savefig(
-        "fig/__fig_load_simulate__.svg", format="svg", transparent=True, dpi=300
-    )
-
+    plt.savefig("fig/__fig_load_simulate__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
@@ -1966,9 +1965,9 @@ def load_simulate_dbscomb():
     plt.xticks(x, session)
     plt.text(
         -0.8,
-        -4.5,
+        -4.0,
         "acute\n  history",
-        fontsize=10,
+        fontsize=label_size,
         ha="center",
         va="center",
     )
@@ -1986,17 +1985,16 @@ def load_simulate_dbscomb():
 
     plt.tick_params(axis="both", labelsize=label_size)
 
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[-0.006, -0.004, 1, 1],
     )
 
     plt.savefig("fig/__fig_load_simulate_dbscomb__.png", dpi=300)
-    plt.savefig(
-        "fig/__fig_load_simulate_dbscomb__.svg", format="svg", transparent=True, dpi=300
-    )
-
+    plt.savefig("fig/__fig_load_simulate_dbscomb__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
@@ -2171,8 +2169,8 @@ def dbs_parameter():
             linestyle="--",
             label="Patient Data",
         )
-        if i == "efferent":
-            ax.legend(fontsize="xx-small")
+        # if i == "efferent":
+        # ax.legend(fontsize=label_size)
 
         # Achsen beschriften
         ax.set_xlabel(parameter_name[idx - 1])
@@ -2192,19 +2190,44 @@ def dbs_parameter():
         if idx == 4:
             ax.set_xticks(np.arange(0, 1.60, 0.5))
 
+        ax.set_xlim(min(param), max(param))
+        ax.tick_params(axis="both", which="major", labelsize=label_size)
+
         idx += 1
         plt.ylim(0.5, 1.4)
-        plt.tick_params(axis="both", labelsize=label_size)
 
+    ###################### legend ##########################
+
+    # global legend below the subplots centered in the figure
+    handles, labels = ax.get_legend_handles_labels()
+    fig = plt.gcf()
+    legend = fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=2,
+        bbox_to_anchor=(0.5, 0),
+        fontsize=label_size,
+        borderaxespad=0,
+        title_fontproperties={"weight": "bold", "size": label_size},
+    )
+
+    # get the coordinates of the legend box
+    legend_bbox = legend.get_window_extent()
+    legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
+
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[-0.005, legend_bbox.y1, 1, 1],
     )
+
+    ################# save fig ######################
+
     plt.savefig("fig/__fig_dbs_parameter__.png", dpi=300)
-    plt.savefig(
-        "fig/__fig_dbs_parameter__.svg", format="svg", transparent=True, dpi=300
-    )
+    plt.savefig("fig/__fig_dbs_parameter__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
@@ -2380,6 +2403,7 @@ def parameter_gpi_inhib():
             color=color[0],
         )
         # settings axis
+        ax1.tick_params(axis="both", which="major", labelsize=label_size)
         ax1.set_xlabel(parameter_name[idx - 1])
         ax1.set_title(i, fontweight="bold", fontsize=label_size)
         if i == "suppression" or i == "afferent":
@@ -2413,17 +2437,13 @@ def parameter_gpi_inhib():
             color=color[1],
         )
         # settings axis
+        ax2.tick_params(axis="both", which="major", labelsize=label_size)
         ax2.set_xlabel(parameter_name[idx - 1])
         ax2.set_title(i, fontweight="bold", fontsize=label_size)
         if i == "efferent" or i == "passing fibres GPe-STN":
             ax2.set_ylabel("average rate", fontweight="bold", fontsize=label_size)
         else:
             ax2.set_yticklabels([])
-
-        # legend
-        lines = [line1, line2, line3]
-        if i == "efferent":
-            ax1.legend(lines, label, loc="upper right", fontsize="xx-small")
 
         # scale x-axis
         if idx == 1:
@@ -2435,26 +2455,52 @@ def parameter_gpi_inhib():
         if idx == 4:
             ax2.set_xticks(np.arange(0, 1.60, 0.5))
 
-        # min/max y-axis
+        # min/max x-/y-axis
         ax1.set_ylim(0.5, 1.4)
         ax2.set_ylim(-0.1, 0.7)
+        ax1.set_xlim(min(param), max(param))
+        ax2.set_xlim(min(param), max(param))
 
         idx += 1
 
     plt.tick_params(axis="both", labelsize=label_size)
 
+    ###################### legend ##########################
+
+    # global legend below the subplots centered in the figure
+    handles1, labels1 = ax1.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    handles = handles1 + handles2
+    labels = labels1 + labels2
+
+    fig = plt.gcf()
+    legend = fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=2,
+        bbox_to_anchor=(0.5, 0),
+        fontsize=label_size,
+        borderaxespad=0,
+        title_fontproperties={"weight": "bold", "size": label_size},
+    )
+
+    # get the coordinates of the legend box
+    legend_bbox = legend.get_window_extent()
+    legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
+
+    # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
+        rect=[-0.004, legend_bbox.y1, 1.002, 1],
     )
+
+    ################## save fig #########################
+
     plt.savefig("fig/__appendix_fig_parameter_gpi_inhib__.png", dpi=300)
-    plt.savefig(
-        "fig/__appendix_fig_parameter_gpi_inhib__.svg",
-        format="svg",
-        transparent=True,
-        dpi=300,
-    )
+    plt.savefig("fig/__appendix_fig_parameter_gpi_inhib__.pdf", format="pdf", dpi=300)
     plt.close("all")
 
 
