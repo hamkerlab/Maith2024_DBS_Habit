@@ -124,7 +124,7 @@ params["ThalPFC.connect_one_to_one"] = 1.0
 ################################ shortcut #####################################
 ###############################################################################
 
-params["ITThal_tau"] = 150000  # 150000
+params["ITThal_tau"] = 200000  # 150000
 params["ITThal_tau_alpha"] = 1.0  # 1.0
 params["ITThal_regularization_threshold"] = 0.93  # 0.93
 params["ITThal_threshold_post"] = 0.1  # 0.1
