@@ -1694,8 +1694,9 @@ if __name__ == "__main__":
             
             if idx == 0:
                 handles, labels = axes[idx].get_legend_handles_labels()
-                new_labels = ["dbs-on", "dbs-off"]
-                axes[idx].legend(
+                # trandform OFF to dbs-off and ON to dbs-on
+                new_labels = [f"dbs-{label.lower()}" for label in labels]
+                legend=axes[idx].legend(
                     handles, new_labels, fontsize=labelsize, loc="upper right"
                 )
             else:
