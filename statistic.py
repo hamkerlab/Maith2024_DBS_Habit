@@ -1501,8 +1501,14 @@ def run_statistic(H1, H2, H3, number_of_persons):
         print("stats H2 with n = ", number_of_persons)
 
         # compare dbs on vs off and different dbs types for plastic and fixed shortcut
-        data_df_full_sims = dbs_on_vs_off(number_of_persons, shortcut=True)
-        dbs_on_vs_off(number_of_persons, shortcut=False)
+        data_df_full_sims_dict = {}
+        data_df_full_sims_dict["plastic"] = dbs_on_vs_off(
+            number_of_persons, shortcut=True
+        )
+        data_df_full_sims_dict["fixed"] = dbs_on_vs_off(
+            number_of_persons, shortcut=False
+        )
+
         # also perform the analysis for the patient data and compare patients with sims
         data_df_full_patients = dbs_on_vs_off(number_of_persons=None)
 
@@ -1511,63 +1517,70 @@ def run_statistic(H1, H2, H3, number_of_persons):
         data_df_full_patients["subject"] = "patient " + data_df_full_patients[
             "subject"
         ].astype(str)
-        data_df_full_sims["subject"] = "simulation " + data_df_full_sims[
-            "subject"
-        ].astype(str)
+        data_df_full_sims_dict["plastic"]["subject"] = (
+            "simulation " + data_df_full_sims_dict["plastic"]["subject"].astype(str)
+        )
+        data_df_full_sims_dict["fixed"]["subject"] = (
+            "simulation " + data_df_full_sims_dict["fixed"]["subject"].astype(str)
+        )
 
-        # for loop over sessions
-        for session in data_df_full_sims["session"].unique():
-            # for loop over dbs states
-            for dbs_state in data_df_full_sims["dbs_state"].unique():
-                # skip afferent and dbs-off
-                if dbs_state == "afferent" or dbs_state == "dbs-off":
-                    continue
-                # filter the simulation data for the current dbs state and dbs-off
-                data_df_full_sims_filtered = data_df_full_sims[
-                    data_df_full_sims["dbs_state"].isin(["dbs-off", dbs_state])
-                ].copy()
-                # rename the dbs state of the sims to dbs-on
-                data_df_full_sims_filtered.loc[
-                    data_df_full_sims_filtered["dbs_state"] == dbs_state, "dbs_state"
-                ] = "dbs-on"
-                # combine the patient and simulation data and add the column "subject_type"
-                data_df_full_sims_filtered["subject_type"] = "simulation"
-                data_df_full_patients["subject_type"] = "patient"
-                data_df_full_combined = pd.concat(
-                    [data_df_full_sims_filtered, data_df_full_patients]
-                )
-                # filter data to only contain session
-                data_df_full_combined = data_df_full_combined[
-                    data_df_full_combined["session"] == session
-                ]
-                # perform a 2 way repeated measures ANOVA with between factor
-                # "subject_type" and within factor "dbs_state"
-                aov = pg.mixed_anova(
-                    data=data_df_full_combined,
-                    dv="unrewarded_decisions",
-                    within="dbs_state",
-                    subject="subject",
-                    between="subject_type",
-                )
-                # save results
-                with open(
-                    f"statistic/patients_vs_sims_{number_of_persons}_{dbs_state}_ses_{session}.txt",
-                    "w",
-                ) as fh:
-                    fh.write(aov.round(3).to_string())
+        # loop over plastic and fixed shortcut
+        for shortcut_type in ["plastic", "fixed"]:
+            data_df_full_sims = data_df_full_sims_dict[shortcut_type]
+            # for loop over sessions
+            for session in data_df_full_sims["session"].unique():
+                # for loop over dbs states
+                for dbs_state in data_df_full_sims["dbs_state"].unique():
+                    # skip afferent and dbs-off
+                    if dbs_state in ["afferent", "dbs-off"]:
+                        continue
+                    # filter the simulation data for the current dbs state and dbs-off
+                    data_df_full_sims_filtered = data_df_full_sims[
+                        data_df_full_sims["dbs_state"].isin(["dbs-off", dbs_state])
+                    ].copy()
+                    # rename the dbs state of the sims to dbs-on
+                    data_df_full_sims_filtered.loc[
+                        data_df_full_sims_filtered["dbs_state"] == dbs_state,
+                        "dbs_state",
+                    ] = "dbs-on"
+                    # combine the patient and simulation data and add the column "subject_type"
+                    data_df_full_sims_filtered["subject_type"] = "simulation"
+                    data_df_full_patients["subject_type"] = "patient"
+                    data_df_full_combined = pd.concat(
+                        [data_df_full_sims_filtered, data_df_full_patients]
+                    )
+                    # filter data to only contain session
+                    data_df_full_combined = data_df_full_combined[
+                        data_df_full_combined["session"] == session
+                    ]
+                    # perform a 2 way repeated measures ANOVA with between factor
+                    # "subject_type" and within factor "dbs_state"
+                    aov = pg.mixed_anova(
+                        data=data_df_full_combined,
+                        dv="unrewarded_decisions",
+                        within="dbs_state",
+                        subject="subject",
+                        between="subject_type",
+                    )
+                    # save results
+                    with open(
+                        f"statistic/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}_ses_{session}.txt",
+                        "w",
+                    ) as fh:
+                        fh.write(aov.round(3).to_string())
 
-                # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
-                plt.figure(figsize=(10, 6))
-                sns.boxplot(
-                    data=data_df_full_combined,
-                    x="subject_type",
-                    y="unrewarded_decisions",
-                    hue="dbs_state",
-                )
-                plt.savefig(
-                    f"statistic/patients_vs_sims_{number_of_persons}_{dbs_state}_ses_{session}.png",
-                )
-                plt.close()
+                    # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
+                    plt.figure(figsize=(10, 6))
+                    sns.boxplot(
+                        data=data_df_full_combined,
+                        x="subject_type",
+                        y="unrewarded_decisions",
+                        hue="dbs_state",
+                    )
+                    plt.savefig(
+                        f"statistic/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}_ses_{session}.png",
+                    )
+                    plt.close()
 
     if H3:
         dbs_state = [

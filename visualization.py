@@ -2931,9 +2931,6 @@ def weights_over_time_lineplots(data):
         # only include pathway "shortcut" and "hyperdirect"
         data = data[data["pathway"].isin(["shortcut", "hyperdirect"])]
 
-        # only include dbs_types "suppression", "efferent"
-        data = data[data["dbs_type"].isin(["suppression", "efferent"])]
-
     # Get unique pathways and dbs_types
     pathways = data["pathway"].unique()
     dbs_types = data["dbs_type"].unique()
@@ -2942,7 +2939,7 @@ def weights_over_time_lineplots(data):
     n = len(pathways)
     m = len(dbs_types)
     fig, axes = plt.subplots(
-        n, m, figsize=(16.5 / 2.54, 4 * n), sharex=True, sharey=True
+        n, m, figsize=(16.5 * (m / 3.0) / 2.54, 15 / 2.54), sharex=True, sharey=True
     )
 
     # If there's only one row or column, axes is not a 2D array
@@ -2953,10 +2950,11 @@ def weights_over_time_lineplots(data):
     significance_height = 0.045
 
     # Function to perform t-test
-    def perform_ttest(subset, channel):
+    def perform_ttest(subset, channel, only_session_3=False):
         p_val_list = []
-        # filter data for session 3
-        subset = subset[subset["session"] == 3]
+        if only_session_3:
+            # filter data for session 3
+            subset = subset[subset["session"] == 3]
         for trial in subset["trial"].unique():
             trial_data = subset[
                 (subset["trial"] == trial) & (subset["channel"] == channel)
@@ -3035,7 +3033,7 @@ def weights_over_time_lineplots(data):
         ncol=2,
         bbox_to_anchor=(0.5, 0),
         fontsize=font_size,
-        borderaxespad=0,
+        borderaxespad=0.05,
         title_fontproperties={"weight": "bold", "size": font_size},
     )
 
@@ -3073,10 +3071,16 @@ def weights_over_time_lineplots(data):
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
-        rect=[0, legend_bbox.y1, 1, 1],
+        rect=[-0.02 / m, legend_bbox.y1, 1.0 - 0.0035 / m, 1],
     )
 
-    plt.savefig("fig/__fig_weights_over_time__.png", dpi=300)
+    # create save string which contains the first letters of the used dbs_types
+    save_string = "".join([s[0] for s in dbs_types])
+
+    plt.savefig(f"fig/__fig_weights_over_time_{save_string}__.png", dpi=300)
+    plt.savefig(
+        f"fig/__fig_weights_over_time_{save_string}__.pdf", format="pdf", dpi=300
+    )
     plt.close("all")
 
 
@@ -3099,7 +3103,13 @@ def weights_over_time():
     weights_over_time_lineplots_old(
         w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict, n_dbs
     )
-    weights_over_time_lineplots(df)
+    # do the new lineplots only for the dbs_types
+    # ["suppression", "efferent", "dbs-comb"]
+    weights_over_time_lineplots(
+        df[df["dbs_type"].isin(["suppression", "efferent", "dbs-comb"])]
+    )
+    # ["passing", "afferent"]
+    weights_over_time_lineplots(df[df["dbs_type"].isin(["passing", "afferent"])])
 
     # Create boxplots for all dbs types and sessions
     weights_over_time_boxplots(
@@ -3126,43 +3136,6 @@ def weights_over_time():
         specific_dbs_types=["suppression", "efferent", "dbs-comb", "OFF"],
         specific_sessions=[3],
     )
-
-    return
-
-    # Perform two-way repeated measures ANOVA for each weight variable
-    # only for suppression, efferent, dbs-comb and session 3
-    specific_dbs_types = ["suppression", "efferent", "dbs-comb"]
-    specific_sessions = [3]
-
-    # Filter the DataFrame to include only the specified dbs_type values
-    df_filtered = df[df["dbs_type"].isin(specific_dbs_types)]
-
-    # Filter the DataFrame to include only the specified sessions
-    df_filtered = df_filtered[df_filtered["session"].isin(specific_sessions)]
-
-    # Perform two-way repeated measures ANOVA for each weight variable
-    weight_vars = [
-        "w_direct_0",
-        "w_direct_1",
-        "w_indirect_0",
-        "w_indirect_1",
-        "w_hyperdirect_0",
-        "w_hyperdirect_1",
-        "w_shortcut_0",
-        "w_shortcut_1",
-        "w_dopa_predict",
-    ]
-
-    for weight_var in weight_vars:
-        aov = pg.rm_anova(
-            dv=weight_var,
-            within=["dbs_type", "dbs_state"],
-            subject="sim_id",
-            data=df_filtered,
-            detailed=True,
-        )
-        print(f"ANOVA results for {weight_var}:\n", aov)
-        print("\n")
 
 
 def support_over_time(shortcut=True, for_selected=True):
@@ -3367,6 +3340,11 @@ def support_over_time(shortcut=True, for_selected=True):
             f"fig/__fig_support_for_selected_over_time_shortcut_{int(shortcut)}__.png",
             dpi=300,
         )
+        plt.savefig(
+            f"fig/__fig_support_for_selected_over_time_shortcut_{int(shortcut)}__.pdf",
+            format="pdf",
+            dpi=300,
+        )
         plt.close("all")
     else:
         # combine the dataframes to one
@@ -3390,6 +3368,11 @@ def support_over_time(shortcut=True, for_selected=True):
         )
         plt.savefig(
             f"fig/__fig_support_for_0_over_time_shortcut_{int(shortcut)}__.png", dpi=300
+        )
+        plt.savefig(
+            f"fig/__fig_support_for_0_over_time_shortcut_{int(shortcut)}__.pdf",
+            format="pdf",
+            dpi=300,
         )
         plt.close("all")
         return
