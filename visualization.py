@@ -3392,12 +3392,28 @@ def support_over_time(shortcut=True, for_selected=True):
             )
             result = model.fit()
 
+            # get the p-values for the coefficients and correct them for multiple comparisons
+            p_values = result.pvalues
+            # exlude Group Var and Intercept
+            p_values = p_values.drop("Group Var")
+            p_values = p_values.drop("Intercept")
+            p_values_corrected = multipletests(p_values, method="bonferroni")[:2]
+            p_values_corrected_df = pd.DataFrame(
+                {
+                    "p-values uncor": p_values,
+                    "p-values cor": p_values_corrected[1],
+                    "reject": p_values_corrected[0],
+                }
+            )
+
             # save results
             with open(
                 f"statistic/support_{['exc', 'inh'][support_df_id]}_difference_dbs_on_off_shortcut_{int(shortcut)}_bin_{bin}.txt",
                 "w",
             ) as fh:
                 fh.write(result.summary().as_text())
+                fh.write("\n")
+                fh.write(p_values_corrected_df.round(3).to_string())
 
 
 #################################################################################################################

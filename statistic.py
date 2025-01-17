@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import statsmodels.formula.api as smf
 from statsmodels.multivariate.manova import MANOVA
+from statsmodels.stats.multitest import multipletests
 
 ####################################### copied from fitting_q_learning ##############################################
 
@@ -1295,12 +1296,28 @@ def dbs_on_vs_off(number_of_persons=None, shortcut=True):
         )
         result = model.fit()
 
+        # get the p-values for the coefficients and correct them for multiple comparisons
+        p_values = result.pvalues
+        # exlude Group Var and Intercept
+        p_values = p_values.drop("Group Var")
+        p_values = p_values.drop("Intercept")
+        p_values_corrected = multipletests(p_values, method="bonferroni")[:2]
+        p_values_corrected_df = pd.DataFrame(
+            {
+                "p-values uncor": p_values,
+                "p-values cor": p_values_corrected[1],
+                "reject": p_values_corrected[0],
+            }
+        )
+
         # save results
         with open(
             f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons if number_of_persons is not None else 'patients'}_shortcut{int(shortcut)}_session_{session}.txt",
             "w",
         ) as fh:
             fh.write(result.summary().as_text())
+            fh.write("\n")
+            fh.write(p_values_corrected_df.round(3).to_string())
 
         # Create a plot for repeated measures with lines for each subject
         # ignore index in data_df
@@ -1568,6 +1585,24 @@ def run_statistic(H1, H2, H3, number_of_persons):
                         "w",
                     ) as fh:
                         fh.write(aov.round(3).to_string())
+
+                    # perform post hoc t-tests
+                    result = pg.pairwise_tests(
+                        data=data_df_full_combined,
+                        dv="unrewarded_decisions",
+                        within="dbs_state",
+                        subject="subject",
+                        between="subject_type",
+                        padjust="bonf",
+                        return_desc=True,
+                    )
+                    # save results in the same file
+                    with open(
+                        f"statistic/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}_ses_{session}.txt",
+                        "a",
+                    ) as fh:
+                        fh.write("\n\npost hoc t-tests:\n")
+                        fh.write(result.round(3).to_string())
 
                     # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
                     plt.figure(figsize=(10, 6))
