@@ -1663,6 +1663,7 @@ if __name__ == "__main__":
         palette = {"ON": (0.8, 0, 0, 0.7), "OFF": (0, 0, 0.65)}
         labelsize = 9
 
+        # Do the combined plot
         for idx, session in enumerate([1, 2, 3]):
             # Filter p_explore_data to only include the current session
             p_explore_data = p_explore_data_all[p_explore_data_all["session"] == session]
@@ -1733,8 +1734,11 @@ if __name__ == "__main__":
         plt.savefig("fig/p_explore_boxplots_combined.pdf", format="pdf", dpi=300)
         plt.close()
 
-
+        # Do the ANOVAs
         for idx, session in enumerate([1, 2, 3]):
+            # Filter p_explore_data to only include the current session
+            p_explore_data = p_explore_data_all[p_explore_data_all["session"] == session]
+
             # pingouin needs different subject ids for different between groups
             for inference_id, inference in enumerate(
                 ["double", "suppression", "efferent", "dbs-comb"]
