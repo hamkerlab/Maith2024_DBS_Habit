@@ -1526,6 +1526,65 @@ def run_statistic(H1, H2, H3, number_of_persons):
             number_of_persons, shortcut=False
         )
 
+        # create a plot comparing dbs_states of simulations
+        # for this plot combine fixed and plastic shortcut data with a new column "shortcut_type"
+        data_df_full_sims_dict["plastic"]["shortcut_type"] = "plastic"
+        data_df_full_sims_dict["fixed"]["shortcut_type"] = "fixed"
+        data_df_full_sims_compare_dbs = pd.concat(
+            [data_df_full_sims_dict["plastic"], data_df_full_sims_dict["fixed"]]
+        )
+        # exclude afferent
+        data_df_full_sims_compare_dbs = data_df_full_sims_compare_dbs[
+            data_df_full_sims_compare_dbs["dbs_state"] != "afferent"
+        ]
+        # order the dbs states (dbs-off, suppression, efferent, passing fibres, dbs-comb)
+        data_df_full_sims_compare_dbs["dbs_state"] = pd.Categorical(
+            data_df_full_sims_compare_dbs["dbs_state"],
+            categories=[
+                "dbs-off",
+                "suppression",
+                "efferent",
+                "passing fibres",
+                "dbs-comb",
+            ],
+            ordered=True,
+        )
+        # n (number of sessions) subplots
+        fig_compare_dbs, axs_compare_dbs = plt.subplots(
+            nrows=1,
+            ncols=len(data_df_full_sims_compare_dbs["session"].unique()),
+            figsize=(16 / 2.54, 9 / 2.54),
+            sharex=True,
+            sharey=True,
+        )
+        # for loop over sessions
+        for session_id, session in enumerate(
+            data_df_full_sims_dict["plastic"]["session"].unique()
+        ):
+            # boxplot with x=shortcut_type, y=unrewarded_decisions, hue=dbs_state
+            sns.boxplot(
+                data=data_df_full_sims_compare_dbs[
+                    data_df_full_sims_compare_dbs["session"] == session
+                ],
+                x="shortcut_type",
+                y="unrewarded_decisions",
+                hue="dbs_state",
+                ax=axs_compare_dbs[session_id],
+                palette={
+                    "suppression": (1, 0.7, 0.7, 0.8),
+                    "efferent": (1, 0.5, 0.5, 0.8),
+                    "dbs-comb": (0.8, 0, 0, 0.8),
+                    "dbs-off": (0.1, 0.3, 0.7, 1.0),  # lighter_darkblue-ish
+                    "passing fibres": (1, 0.3, 0.3, 0.8),
+                },
+                legend=session_id == 2,
+            )
+        fig_compare_dbs.tight_layout(pad=0, h_pad=1.08, w_pad=0.0, rect=[0, 0, 1, 1])
+        fig_compare_dbs.savefig(
+            f"fig/simulation_data_difference_dbs_on_off_{number_of_persons}.png"
+        )
+        plt.close(fig_compare_dbs)
+
         # also perform the analysis for the patient data and compare patients with sims
         data_df_full_patients = dbs_on_vs_off(number_of_persons=None)
 
@@ -1543,14 +1602,36 @@ def run_statistic(H1, H2, H3, number_of_persons):
 
         # loop over plastic and fixed shortcut
         for shortcut_type in ["plastic", "fixed"]:
+
+            # create a figure with n (number dbs_states - 2) time m (number of sessions)
+            # subplots
+            fig_full, axs_full = plt.subplots(
+                nrows=len(data_df_full_sims_dict["plastic"]["dbs_state"].unique()) - 2,
+                ncols=len(data_df_full_sims_dict["plastic"]["session"].unique()),
+                figsize=(12 / 2.54, 18 / 2.54),
+                sharex=True,
+                sharey=True,
+            )
+
             data_df_full_sims = data_df_full_sims_dict[shortcut_type]
-            # for loop over sessions
-            for session in data_df_full_sims["session"].unique():
-                # for loop over dbs states
-                for dbs_state in data_df_full_sims["dbs_state"].unique():
-                    # skip afferent and dbs-off
-                    if dbs_state in ["afferent", "dbs-off"]:
-                        continue
+            # for loop over dbs states
+            dbs_state_id = 0
+            for dbs_state in data_df_full_sims["dbs_state"].unique():
+                # skip afferent and dbs-off
+                if dbs_state in ["afferent", "dbs-off"]:
+                    continue
+                # create a figure with m (number of sessions) subplots
+                fig, axs = plt.subplots(
+                    nrows=1,
+                    ncols=len(data_df_full_sims_dict["plastic"]["session"].unique()),
+                    figsize=(12 / 2.54, 7 / 2.54),
+                    sharex=True,
+                    sharey=True,
+                )
+                # for loop over sessions
+                for session_id, session in enumerate(
+                    data_df_full_sims["session"].unique()
+                ):
                     # filter the simulation data for the current dbs state and dbs-off
                     data_df_full_sims_filtered = data_df_full_sims[
                         data_df_full_sims["dbs_state"].isin(["dbs-off", dbs_state])
@@ -1605,17 +1686,45 @@ def run_statistic(H1, H2, H3, number_of_persons):
                         fh.write(result.round(3).to_string())
 
                     # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
-                    plt.figure(figsize=(10, 6))
                     sns.boxplot(
                         data=data_df_full_combined,
                         x="subject_type",
                         y="unrewarded_decisions",
                         hue="dbs_state",
+                        ax=axs[session_id],
+                        palette={"dbs-off": "blue", "dbs-on": "red"},
                     )
-                    plt.savefig(
-                        f"statistic/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}_ses_{session}.png",
+                    sns.boxplot(
+                        data=data_df_full_combined,
+                        x="subject_type",
+                        y="unrewarded_decisions",
+                        hue="dbs_state",
+                        ax=axs_full[dbs_state_id, session_id],
+                        palette={"dbs-off": "blue", "dbs-on": "red"},
                     )
-                    plt.close()
+
+                fig.tight_layout(
+                    pad=0,
+                    h_pad=1.08,
+                    w_pad=0.0,
+                    rect=[0, 0, 1, 1],
+                )
+                fig.savefig(
+                    f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}.png",
+                )
+                plt.close(fig)
+                dbs_state_id += 1
+
+            fig_full.tight_layout(
+                pad=0,
+                h_pad=1.08,
+                w_pad=0.0,
+                rect=[0, 0, 1, 1],
+            )
+            fig_full.savefig(
+                f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}.png",
+            )
+            plt.close(fig_full)
 
     if H3:
         dbs_state = [
