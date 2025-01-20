@@ -46,6 +46,7 @@ fig_load_simulate_dbscomb = True
 fig_dbs_parameter = True
 fig_parameter_gpi_inhib = True
 fig_weights_over_time = True
+fig_support_over_time = True
 
 
 ###################################################################################################################
@@ -611,6 +612,13 @@ if plot_figures:
 
     if fig_weights_over_time:
         vis.weights_over_time()
+
+    if fig_support_over_time:
+        # analyze support for selected action for plastic and fixed shortcut
+        vis.support_over_time(shortcut=True)
+        vis.support_over_time(shortcut=False)
+        # plot support for "action 0" for plastic shortcut
+        vis.support_over_time(shortcut=True, for_selected=False)
 
 
 #####################################################################################################
