@@ -2980,7 +2980,13 @@ def weights_over_time_lineplots(data):
             # Filter the data for the current pathway and dbs_type and plot the lineplot
             subset = data[(data["pathway"] == pathway) & (data["dbs_type"] == dbs_type)]
             sns.lineplot(
-                data=subset, x="trial", y="w", hue="dbs_state", style="channel", ax=ax
+                data=subset,
+                x="trial",
+                y="w",
+                hue="dbs_state",
+                style="channel",
+                ax=ax,
+                palette={"ON": "red", "OFF": "blue"},
             )
 
             # horizontal line at 0, vertical lines at 40 and 80

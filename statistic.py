@@ -1549,27 +1549,26 @@ def run_statistic(H1, H2, H3, number_of_persons):
             ],
             ordered=True,
         )
-        # n (number of sessions) subplots
+        # 2 (plastic/fixed) times n (number of sessions) subplots
         fig_compare_dbs, axs_compare_dbs = plt.subplots(
-            nrows=1,
-            ncols=len(data_df_full_sims_compare_dbs["session"].unique()),
-            figsize=(16 / 2.54, 9 / 2.54),
+            nrows=2,
+            ncols=1,
+            figsize=(16 / 2.54, 14 / 2.54),
             sharex=True,
             sharey=True,
         )
-        # for loop over sessions
-        for session_id, session in enumerate(
-            data_df_full_sims_dict["plastic"]["session"].unique()
-        ):
+        # for loop over shortcut_type
+        for shortcut_type_id, shortcut_type in enumerate(["plastic", "fixed"]):
+
             # boxplot with x=shortcut_type, y=unrewarded_decisions, hue=dbs_state
             sns.boxplot(
                 data=data_df_full_sims_compare_dbs[
-                    data_df_full_sims_compare_dbs["session"] == session
+                    data_df_full_sims_compare_dbs["shortcut_type"] == shortcut_type
                 ],
-                x="shortcut_type",
+                x="session",
                 y="unrewarded_decisions",
                 hue="dbs_state",
-                ax=axs_compare_dbs[session_id],
+                ax=axs_compare_dbs[shortcut_type_id],
                 palette={
                     "suppression": (1, 0.7, 0.7, 0.8),
                     "efferent": (1, 0.5, 0.5, 0.8),
@@ -1577,7 +1576,17 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     "dbs-off": (0.1, 0.3, 0.7, 1.0),  # lighter_darkblue-ish
                     "passing fibres": (1, 0.3, 0.3, 0.8),
                 },
-                legend=session_id == 2,
+                legend=shortcut_type_id == 1,
+            )
+        for row_idx, row_label in enumerate(["A", "B"]):
+            axs_compare_dbs[row_idx].text(
+                -0.1,
+                1.0,
+                row_label,
+                transform=axs_compare_dbs[row_idx].transAxes,
+                fontsize=12,
+                va="center",
+                ha="center",
             )
         fig_compare_dbs.tight_layout(pad=0, h_pad=1.08, w_pad=0.0, rect=[0, 0, 1, 1])
         fig_compare_dbs.savefig(
@@ -1600,8 +1609,18 @@ def run_statistic(H1, H2, H3, number_of_persons):
             "simulation " + data_df_full_sims_dict["fixed"]["subject"].astype(str)
         )
 
+        # create a figure with m (number of sessions) times 2 (plastic/fixed)
+        # subplots
+        fig_fixed_and_plastic, axs_fixed_and_plastic = plt.subplots(
+            nrows=1,
+            ncols=len(data_df_full_sims_dict["plastic"]["session"].unique()) + 1,
+            figsize=(16 / 2.54, 7 / 2.54),
+            sharex=True,
+            sharey=True,
+        )
+
         # loop over plastic and fixed shortcut
-        for shortcut_type in ["plastic", "fixed"]:
+        for shortcut_type_id, shortcut_type in enumerate(["plastic", "fixed"]):
 
             # create a figure with n (number dbs_states - 2) time m (number of sessions)
             # subplots
@@ -1646,11 +1665,17 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     data_df_full_patients["subject_type"] = "patient"
                     data_df_full_combined = pd.concat(
                         [data_df_full_sims_filtered, data_df_full_patients]
-                    )
+                    ).copy()
                     # filter data to only contain session
                     data_df_full_combined = data_df_full_combined[
                         data_df_full_combined["session"] == session
                     ]
+                    # order the subject_type (patient, simulation)
+                    data_df_full_combined["subject_type"] = pd.Categorical(
+                        data_df_full_combined["subject_type"],
+                        categories=["patient", "simulation"],
+                        ordered=True,
+                    )
                     # perform a 2 way repeated measures ANOVA with between factor
                     # "subject_type" and within factor "dbs_state"
                     aov = pg.mixed_anova(
@@ -1693,6 +1718,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                         hue="dbs_state",
                         ax=axs[session_id],
                         palette={"dbs-off": "blue", "dbs-on": "red"},
+                        legend=session_id == 2,
                     )
                     sns.boxplot(
                         data=data_df_full_combined,
@@ -1701,8 +1727,42 @@ def run_statistic(H1, H2, H3, number_of_persons):
                         hue="dbs_state",
                         ax=axs_full[dbs_state_id, session_id],
                         palette={"dbs-off": "blue", "dbs-on": "red"},
+                        legend=session_id == 2
+                        and dbs_state_id
+                        == len(data_df_full_sims_dict["plastic"]["dbs_state"].unique())
+                        - 2
+                        - 1,
                     )
+                    if dbs_state == "dbs-comb" and shortcut_type == "plastic":
+                        sns.boxplot(
+                            data=data_df_full_combined,
+                            x="subject_type",
+                            y="unrewarded_decisions",
+                            hue="dbs_state",
+                            ax=axs_fixed_and_plastic[session_id],
+                            palette={"dbs-off": "blue", "dbs-on": "red"},
+                            legend=False,
+                        )
+                    elif (
+                        dbs_state == "dbs-comb"
+                        and shortcut_type == "fixed"
+                        and session_id == 2
+                    ):
+                        sns.boxplot(
+                            # only data for subject_type == "simulation"
+                            data=data_df_full_combined,
+                            x="subject_type",
+                            y="unrewarded_decisions",
+                            hue="dbs_state",
+                            ax=axs_fixed_and_plastic[-1],
+                            palette={"dbs-off": "blue", "dbs-on": "red"},
+                            legend=True,
+                        )
 
+                for column_idx, column_label in enumerate(
+                    ["Session 1", "Session 2", "Session 3"]
+                ):
+                    axs[column_idx].set_title(column_label)
                 fig.tight_layout(
                     pad=0,
                     h_pad=1.08,
@@ -1715,6 +1775,10 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 plt.close(fig)
                 dbs_state_id += 1
 
+            for column_idx, column_label in enumerate(
+                ["Session 1", "Session 2", "Session 3"]
+            ):
+                axs_full[0, column_idx].set_title(column_label)
             fig_full.tight_layout(
                 pad=0,
                 h_pad=1.08,
@@ -1725,6 +1789,22 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}.png",
             )
             plt.close(fig_full)
+
+        for column_idx, column_label in enumerate(
+            ["Session 1", "Session 2", "Session 3", "Session 3\n(fixed shortcut)"]
+        ):
+            axs_fixed_and_plastic[column_idx].set_title(column_label)
+
+        fig_fixed_and_plastic.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=0.0,
+            rect=[0, 0, 1, 1],
+        )
+        fig_fixed_and_plastic.savefig(
+            f"fig/patients_vs_sims_plastic_and_fixed_{number_of_persons}.png",
+        )
+        plt.close(fig_fixed_and_plastic)
 
     if H3:
         dbs_state = [
