@@ -1309,6 +1309,28 @@ def dbs_on_vs_off(number_of_persons=None, shortcut=True):
                 "reject": p_values_corrected[0],
             }
         )
+        # also add the corresponding  coefficients, Std.Err., z values, and confidence intervalls to the dataframe
+        further_columns = {
+            "coefficients": result.params,
+            "Std.Err.": result.bse,
+            "z values": result.tvalues,
+            "[0.025": result.conf_int()[0],
+            "0.975]": result.conf_int()[1],
+        }
+        for column_name, column_data in further_columns.items():
+            further_columns[column_name] = column_data.drop("Group Var")
+            further_columns[column_name] = further_columns[column_name].drop(
+                "Intercept"
+            )
+        p_values_corrected_df = pd.concat(
+            [p_values_corrected_df, pd.DataFrame(further_columns)], axis=1
+        )
+
+        # save the p_values_corrected_df as csv
+        p_values_corrected_df.round(3).to_csv(
+            f"statistic/simulation_data_difference_dbs_on_off_{number_of_persons if number_of_persons is not None else 'patients'}_shortcut{int(shortcut)}_session_{session}.csv",
+            decimal=",",
+        )
 
         # save results
         with open(
