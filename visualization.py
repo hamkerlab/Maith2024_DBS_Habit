@@ -3501,7 +3501,7 @@ def support_over_time(shortcut=True, for_selected=True):
         ax.set_titles(col_template="{col_name}", fontweight="bold", fontsize=label_size)
 
         for ax_sub in ax.axes.flat:
-            ax_sub.set_xlabel("bin", fontweight="bold", fontsize=label_size)
+            ax_sub.set_xlabel("trial", fontweight="bold", fontsize=label_size)
             ax_sub.set_ylabel("support", fontweight="bold", fontsize=label_size)
             ax_sub.tick_params(axis="x", labelsize=label_size)
             ax_sub.tick_params(axis="y", labelsize=label_size)
