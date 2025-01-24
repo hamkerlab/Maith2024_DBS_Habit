@@ -3412,6 +3412,29 @@ def support_over_time(shortcut=True, for_selected=True):
                 }
             )
 
+            # also add the corresponding  coefficients, Std.Err., z values, and confidence intervalls to the dataframe
+            further_columns = {
+                "coefficients": result.params,
+                "Std.Err.": result.bse,
+                "z values": result.tvalues,
+                "[0.025": result.conf_int()[0],
+                "0.975]": result.conf_int()[1],
+            }
+            for column_name, column_data in further_columns.items():
+                further_columns[column_name] = column_data.drop("Group Var")
+                further_columns[column_name] = further_columns[column_name].drop(
+                    "Intercept"
+                )
+            p_values_corrected_df = pd.concat(
+                [p_values_corrected_df, pd.DataFrame(further_columns)], axis=1
+            )
+
+            # save the p_values_corrected_df as csv
+            p_values_corrected_df.round(3).to_csv(
+                f"statistic/support_{['exc', 'inh'][support_df_id]}_difference_dbs_on_off_shortcut_{int(shortcut)}_bin_{bin}.csv",
+                decimal=",",
+            )
+
             # save results
             with open(
                 f"statistic/support_{['exc', 'inh'][support_df_id]}_difference_dbs_on_off_shortcut_{int(shortcut)}_bin_{bin}.txt",
