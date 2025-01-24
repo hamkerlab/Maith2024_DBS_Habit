@@ -24,7 +24,7 @@ __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
 __fig_weights_over_time__ = False
-__fig_support_over_time__ = False
+__fig_support_over_time__ = True
 
 
 ##############################################################################
@@ -2611,7 +2611,7 @@ def weights_over_time_boxplots(
         df_filtered_plot = df_filtered_plot.groupby(
             ["sim_id", "dbs_type", "session", "pathway", "channel"], as_index=False
         ).mean()
-        ax = sns.boxplot(
+        axes = sns.boxplot(
             x=x,
             y="w",
             hue=hue,
@@ -2630,7 +2630,7 @@ def weights_over_time_boxplots(
                 "markerfacecolor": "black",
                 "markeredgecolor": "white",
             },
-            linecolor="black",
+            # linecolor="black",
             order=order,
             hue_order=hue_order,
         )
@@ -3144,6 +3144,11 @@ def weights_over_time():
     )
 
 
+#################################################################################################################
+################################### __fig_support_over_time__ ########################################
+#################################################################################################################
+
+
 def support_over_time(shortcut=True, for_selected=True):
     """
     Plots the support of the Thal neurons throughout the task for the different dbs types and shortcut modes.
@@ -3273,15 +3278,17 @@ def support_over_time(shortcut=True, for_selected=True):
     support_exc_df = pd.DataFrame.from_dict(support_exc_plot_dict)
     support_inh_df = pd.DataFrame.from_dict(support_inh_plot_dict)
 
-    # do plotting
+    ######################################### Plot ########################################
     if for_selected:
         # use the data from support_exc_plot_dict to plot boxplots using seaborn with
         # x="bin", y="support", hue="dbs_state"
-        plt.figure(figsize=(10, 15))
+        plt.figure(figsize=(5, 7.5))
         # create three subplots for exc, inh support
         ax_exc = plt.subplot(211)
         ax_inh = plt.subplot(212)
-        sns.boxplot(
+
+        ##################### support_exc_plot_ ########################
+        ax1 = sns.boxplot(
             x="bin",
             y="support",
             hue="dbs_state",
@@ -3289,7 +3296,7 @@ def support_over_time(shortcut=True, for_selected=True):
                 "suppression": (1, 0.7, 0.7, 0.8),
                 "efferent": (1, 0.5, 0.5, 0.8),
                 "dbs-comb": (0.8, 0, 0, 0.8),
-                "dbs-off": "darkblue",
+                "dbs-off": lighter_darkblue,
             },
             data=support_exc_df,
             ax=ax_exc,
@@ -3298,11 +3305,33 @@ def support_over_time(shortcut=True, for_selected=True):
                 "markerfacecolor": "black",
                 "markeredgecolor": "white",
             },
-            linecolor="black",
+            flierprops={
+                "marker": "o",
+                "color": "black",
+                "markersize": 4,
+                "markeredgecolor": "black",
+                "markerfacecolor": "none",
+            },
         )
-        ax_exc.axhline(0, color="black", linestyle="--", alpha=0.5)
-        # same for support_inh_plot_dict
-        sns.boxplot(
+
+        ax1.axhline(0, color="black", linestyle="--", alpha=0.5)
+
+        # settings x-axis
+        ax1.tick_params(axis="both", labelsize=label_size)  # Upper plot
+        ax1.set_xticks([0, 1, 2])
+        ax1.set_xticklabels([])
+
+        # labels
+        ax1.set_ylabel(
+            "shortcuts' support for selected", fontweight="bold", fontsize=label_size
+        )
+        ax1.set_xlabel("")
+
+        # legend
+        ax1.legend(loc="upper left", fontsize=label_size)
+
+        ##################### support_inh_plot_ ########################
+        ax2 = sns.boxplot(
             x="bin",
             y="support",
             hue="dbs_state",
@@ -3310,7 +3339,7 @@ def support_over_time(shortcut=True, for_selected=True):
                 "suppression": (1, 0.7, 0.7, 0.8),
                 "efferent": (1, 0.5, 0.5, 0.8),
                 "dbs-comb": (0.8, 0, 0, 0.8),
-                "dbs-off": "darkblue",
+                "dbs-off": lighter_darkblue,
             },
             data=support_inh_df,
             ax=ax_inh,
@@ -3319,19 +3348,38 @@ def support_over_time(shortcut=True, for_selected=True):
                 "markerfacecolor": "black",
                 "markeredgecolor": "white",
             },
-            linecolor="black",
-            legend=False,
+            flierprops={
+                "marker": "o",
+                "color": "black",
+                "markersize": 4,
+                "markeredgecolor": "black",
+                "markerfacecolor": "none",
+            },
         )
-        ax_inh.axhline(0, color="black", linestyle="--", alpha=0.5)
+        ax2.axhline(0, color="black", linestyle="--", alpha=0.5)
 
-        ax_exc.set_ylabel("shortcuts' support for selected")
-        ax_inh.set_ylabel("basal ganglias' support for selected")
-        # ax_exc legend position top right
-        ax_exc.legend(loc="upper right")
-        # equalize the axes ranges by first getting the current limits and then use the
-        # maximum of the absolute values
-        ax_exc_ylim = ax_exc.get_ylim()
-        ax_inh_ylim = ax_inh.get_ylim()
+        # settings x-axis
+        ax2.tick_params(axis="both", labelsize=label_size)
+
+        # labels
+        ax2.set_ylabel(
+            "basal ganglias' support for selected",
+            fontweight="bold",
+            fontsize=label_size,
+        )
+        ax2.set_xlabel(
+            "Session",
+            fontweight="bold",
+            fontsize=label_size,
+        )
+        ax2.set_xticklabels([1, 2, 3])  # Ändert die Labels auf 1, 2, 3
+
+        # legend
+        ax2.get_legend().remove()
+
+        ############### min/max ################
+        ax_exc_ylim = ax1.get_ylim()
+        ax_inh_ylim = ax2.get_ylim()
         ax_exc.set_ylim(
             min(ax_exc_ylim[0], ax_inh_ylim[0]),
             max(ax_exc_ylim[1], ax_inh_ylim[1]),
@@ -3341,7 +3389,82 @@ def support_over_time(shortcut=True, for_selected=True):
             max(ax_exc_ylim[1], ax_inh_ylim[1]),
         )
 
-        plt.tight_layout()
+        ################################################### significance * #############################################
+
+        # function for significance
+        def add_star(ax, x, y, efferent):
+
+            y_offset = 0.01
+
+            # dbs-off -> supression, efferent, dbs-comb
+            if efferent:
+                for i in range(3):
+                    if i == 0:
+                        x2 = x + 0.2
+                    else:
+                        x2 = x2 + 0.2
+                        if shortcut == False:
+                            y = y + 0.07
+                        else:
+                            y = y + 0.1
+
+                    ax.plot(
+                        [x, x, x2, x2],
+                        [y, y + y_offset, y + y_offset, y],
+                        color="black",
+                        linewidth=1,
+                    )
+                    ax.text((x + x2) / 2, y, "*", fontsize=10, ha="center")
+            else:
+                for i in range(2):
+                    if i == 0:
+                        x2 = x + 0.2
+                    else:
+                        x2 = x2 + 0.4
+                        if shortcut == False:
+                            y = y + 0.07
+                        else:
+                            y = y + 0.1
+
+                    ax.plot(
+                        [x, x, x2, x2],
+                        [y, y + y_offset, y + y_offset, y],
+                        color="black",
+                        linewidth=1,
+                    )
+                    ax.text((x + x2) / 2, y, "*", fontsize=10, ha="center")
+
+        # no significance exc/short0
+
+        # significance inh/short0
+        if shortcut == False:
+            add_star(ax_inh, -0.3, 0.98, True)  # session1
+            add_star(ax_inh, 0.7, 1.05, False)  # session2
+            add_star(ax_inh, 1.7, 1.05, False)  # session3
+
+        # significance exc/short1
+        if shortcut == True:
+            add_star(ax_exc, -0.3, 0.65, False)  # session1
+            # no significance                    # session2
+            add_star(ax_exc, 1.7, 1.05, True)  # session3
+
+        # significance inh/short1
+        if shortcut == True:
+            add_star(ax_inh, -0.3, 1.05, True)  # session1
+            add_star(ax_inh, 0.7, 1.15, False)  # session2
+            add_star(ax_inh, 1.7, 1.25, True)  # session3
+
+        ############################ optimize layout #################################
+        # Adjust layout
+        plt.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=1.08,
+            rect=[0, -0.004, 1, 1],
+        )
+
+        ################################ save fig #####################################
+
         plt.savefig(
             f"fig/__fig_support_for_selected_over_time_shortcut_{int(shortcut)}__.png",
             dpi=300,
@@ -3353,6 +3476,7 @@ def support_over_time(shortcut=True, for_selected=True):
         )
         plt.close("all")
     else:
+
         # combine the dataframes to one
         support_exc_df_dbs = support_exc_df.copy()
         support_exc_df_dbs["support_type"] = "shortcut"
@@ -3362,8 +3486,8 @@ def support_over_time(shortcut=True, for_selected=True):
 
         # use seaborns relplot to plot the data with x="bin", y="support",
         # hue="support_type", col="dbs_state"
-        plt.figure(figsize=(15, 10))
-        sns.relplot(
+        fig = plt.figure(figsize=(6.5, 3))
+        ax = sns.relplot(
             x="bin",
             y="support",
             hue="support_type",
@@ -3372,6 +3496,52 @@ def support_over_time(shortcut=True, for_selected=True):
             data=support_df_dbs,
             palette={"shortcut": "red", "basal ganglia": "blue"},
         )
+
+        # dbs-states layout
+        ax.set_titles(col_template="{col_name}", fontweight="bold", fontsize=label_size)
+
+        for ax_sub in ax.axes.flat:
+            ax_sub.set_xlabel("bin", fontweight="bold", fontsize=label_size)
+            ax_sub.set_ylabel("support", fontweight="bold", fontsize=label_size)
+            ax_sub.tick_params(axis="x", labelsize=label_size)
+            ax_sub.tick_params(axis="y", labelsize=label_size)
+
+        # Extrahiere die Handles und Labels der Legende
+        handles, labels = ax.legend.legend_handles, [
+            text.get_text() for text in ax.legend.texts
+        ]
+
+        # Entferne die lokale Legende
+        ax.legend.remove()
+
+        # Füge die globale Legende hinzu
+        # fig = ax.fig
+        fig = plt.gcf()
+        legend = fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            ncol=2,
+            bbox_to_anchor=(0.5, 0),
+            fontsize=label_size,
+            borderaxespad=0,
+            title_fontproperties={"weight": "bold", "size": label_size},
+        )
+
+        # get the coordinates of the legend box
+        legend_bbox = legend.get_window_extent()
+        legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
+
+        # Adjust layout
+        plt.tight_layout(
+            pad=0,
+            h_pad=1.08,
+            w_pad=1.08,
+            rect=[0, legend_bbox.y1, 1, 1],
+        )
+
+        ###################### save fig ##########################
+
         plt.savefig(
             f"fig/__fig_support_for_0_over_time_shortcut_{int(shortcut)}__.png", dpi=300
         )
@@ -3490,4 +3660,4 @@ if __name__ == "__main__":
         support_over_time(shortcut=True)
         support_over_time(shortcut=False)
         # plot support for "action 0" for plastic shortcut
-        support_over_time(shortcut=True, for_selected=False)
+        # support_over_time(shortcut=True, for_selected=False)
