@@ -1204,6 +1204,7 @@ def estimate_p_explore_process_subject(
     plt.xlim(session_borders[0], session_borders[-1])
     
     # settings y ticks
+    plt.ylabel("Q values", fontsize=labelsize, fontweight='bold')
     plt.tick_params(axis='both', labelsize=labelsize)
 
     # calculate the percentage of time the patient explores (selecting action with
@@ -1696,7 +1697,8 @@ if __name__ == "__main__":
             if idx == 0:
                 handles, labels = axes[idx].get_legend_handles_labels()
                 # trandform OFF to dbs-off and ON to dbs-on
-                new_labels = [f"dbs-{label.lower()}" for label in labels]
+                #new_labels = [f"dbs-{label.lower()}" for label in labels]
+                new_labels = ["DBS OFF","DBS ON"]
                 legend=axes[idx].legend(
                     handles, new_labels, fontsize=labelsize, loc="upper right"
                 )
@@ -1707,7 +1709,7 @@ if __name__ == "__main__":
                 axes[idx].set_xlabel("Inference Data", fontweight="bold", fontsize=labelsize)
                 # Customize x-axis labels
                 axes[idx].set_xticklabels(
-                    ["patients", "supression", "efferent", "dbs-comb"], 
+                    ["patients", "supression", "efferent", "combined"], 
                     fontsize=labelsize  # Adjust font size here
                 )
               
@@ -1891,8 +1893,14 @@ if __name__ == "__main__":
         plt.tick_params(axis='both', labelsize=labelsize)
         plt.xlabel("Feature", fontweight="bold", fontsize=labelsize)
         plt.xticks(rotation=45)
-        plt.ylabel("Difference to DBS-OFF", fontweight="bold", fontsize=labelsize)
-        plt.legend(fontsize=labelsize, loc="upper left")
+        plt.ylabel("Difference to DBS OFF", fontweight="bold", fontsize=labelsize)
+
+
+        # legend
+        handles, labels = plt.gca().get_legend_handles_labels()
+        labels = ['combined' if label == 'dbs-comb' else label for label in labels]
+        plt.legend(handles, labels, fontsize=labelsize, loc="upper left")
+        #plt.legend(fontsize=labelsize, loc="upper left")
         
         # Adjust layout
         plt.tight_layout(

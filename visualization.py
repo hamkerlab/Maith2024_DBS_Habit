@@ -24,7 +24,7 @@ __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
 __fig_weights_over_time__ = False
-__fig_support_over_time__ = True
+__fig_support_over_time__ = False
 
 
 ##############################################################################
@@ -49,9 +49,9 @@ lighter_darkblue = (0, 0, 0.65)
 def shortcut_on_off(switch, number_of_simulations):
 
     ################################################# load data #################################################
-    # load simulation data
     filepath1 = "data/simulation_data/Results_Shortcut0_DBS_State0.json"
     filepath2 = "data/simulation_data/Results_Shortcut1_DBS_State0.json"
+    filepath3 = "data/patient_data/RewardsPerSession_OFF.json"
 
     result1 = stat.read_json_data(filepath1)
     result2 = stat.read_json_data(filepath2)
@@ -62,160 +62,99 @@ def shortcut_on_off(switch, number_of_simulations):
         result1 = stat.processing_data(result1, number_of_simulations)
         result2 = stat.processing_data(result2, number_of_simulations)
 
-    # load patient data
-    filepath1 = "data/patient_data/RewardsPerSession_ON.json"
-    filepath2 = "data/patient_data/RewardsPerSession_OFF.json"
-
-    # delete nan rows and switch rewarded to unrewarded decision
-    result3 = stat.read_json_data(filepath2)
+    result3 = stat.read_json_data(filepath3)
     result3 = result3[~np.isnan(result3).any(axis=1)]
     result3 = 40 - result3
 
-    ################################################## Data Point Cloud ##########################################
-
+    ################################################## Prepare Data ##################################################
     data = [
-        result3.T,
-        result2.T,
-        result1.T,
+        result3.T.flatten(),
+        result2.T.flatten(),
+        result1.T.flatten(),
     ]
 
-    data = np.array(data)
+    categories = ["DBS OFF Patients", "Model Plastic Shortcut", "Model Fixed Shortcut"]
+    sessions = np.repeat(["1", "2", "3"], len(data[0]) // 3)
 
-    """
-    ############################################## means ###############################################
-    # mean simulation data
-    mean1 = stat.mean_data(result1)
-    mean2 = stat.mean_data(result2)
+    df = pd.DataFrame(
+        {
+            "Value": np.concatenate(data),
+            "Category": np.repeat(categories, len(data[0])),
+            "Session": np.tile(sessions, 3),
+        }
+    )
 
-    # mean patient data
-    mean_sessions = stat.mean_dbs_session(filepath1, filepath2, switch)
-    meanOFF = mean_sessions[1]
+    colors = [
+        lighter_darkblue,  # Violett mit Transparenz
+        "steelblue",  # Türkis mit Transparenz
+        "lightblue",  # Gelblich mit Transparenz
+    ]
 
-    # mean bars
-    means = [meanOFF, mean2, mean1]
+    ################################################## Plot Data ##################################################
+    sns.set(style="ticks")
+    plt.figure(figsize=(3.4, 3.4))
 
-    ######################################### standard errors ##########################################
-    # standard error simualtion data
-    standarderror1 = stat.standarderror_data(result1)
-    standarderror2 = stat.standarderror_data(result2)
+    ax = sns.boxplot(
+        data=df,
+        x="Session",
+        y="Value",
+        hue="Category",
+        palette=colors,
+        showmeans=False,
+        meanprops={
+            "markerfacecolor": "black",
+            "markeredgecolor": "white",
+            "markersize": 4,
+        },
+        flierprops={
+            "marker": "o",
+            "color": "black",
+            "markersize": 4,
+            "markeredgecolor": "black",
+            "markerfacecolor": "none",
+        },
+        linewidth=1,
+    )
 
-    # standard error patient data
-    standarderror = stat.session_standard_error(filepath1, filepath2, switch)
-    standarderrorOFF = standarderror[1]
+    for spine in ax.spines.values():
+        spine.set_linewidth(1)  # Setze die Linienstärke auf "normal"
 
-    # standarderrors bars
-    standarderrors = [standarderrorOFF, standarderror2, standarderror1]
-    """
-
-    ############################################### histo settings ##############################################
-
-    # sessions
-    sessions = ["1", "2", "3"]
-    x = np.arange(len(sessions)) * 1.5
-
-    # bar width
-    width = 0.3
-
-    # bar colors
-    colors = [lighter_darkblue, "steelblue", "lightblue"]
-
-    # bar positions
-    positions = [x - 1.3 * width, x, x + 1.3 * width]
-
-    labels = ["DBS OFF Patients", "Model Plastic Shortcut", "Model Fixed Shortcut"]
-
-    fig, ax = plt.subplots(figsize=(3.4, 3.4))
-
-    ################################################## boxplots data #################################################
-
-    for i in range(len(data)):
-        # boxplot for each category and session
-        bp = ax.boxplot(
-            data[i].T,
-            positions=positions[i],
-            widths=0.3,
-            patch_artist=True,
-            showmeans=False,
-            meanline=False,
-            meanprops={
-                "marker": "o",
-                "markerfacecolor": "red",
-                "markeredgecolor": "black",
-                "markersize": 3,
-                "linestyle": "--",
-                "linewidth": 1,
-            },
-            boxprops={"color": "black"},
-            medianprops={"color": "black"},
-            whiskerprops={"color": "black"},
-            capprops={"color": "black"},
-            flierprops={
-                "marker": "o",
-                "color": "black",
-                "markersize": 3,
-                "markeredgecolor": "black",
-            },
-        )
-
-        bp["boxes"][0].set_label(labels[i])
-
-        # boxplot color
-        for patch in bp["boxes"]:
-            patch.set_facecolor(colors[i])
-            patch.set_edgecolor("black")
-
-    # legend
-    ax.legend(fontsize=label_size)  # small
-
-    ################################################### significance * #############################################
-
-    # function for significance
-    def add_star(ax, x1, x2, y):
-        """Add asterisks for significant differences."""
+    ################################################### Significance * ###################################################
+    def add_star(x1, x2, y):
         y_offset = 0.5
-        ax.plot(
+        plt.plot(
             [x1, x1, x2, x2],
             [y, y + y_offset, y + y_offset, y],
+            lw=1,
             color="black",
-            linewidth=1,
         )
-        ax.text((x1 + x2) / 2, y + y_offset, "*", fontsize=12, ha="center")
+        plt.text((x1 + x2) / 2, y + y_offset, "*", ha="center", fontsize=12)
 
-    # star position
-    add_star(ax, 3, 3.4, 22)
+    add_star(2, 2.27, 22)
 
-    ################################################### axis settings ###############################################
-
+    ################################################### Axis Settings ###################################################
     ax.tick_params(axis="both", labelsize=label_size)
-
-    # x-axis
-    plt.xticks(x, sessions)
-
-    # y-axis
-    plt.xlabel("Session", fontweight="bold", fontsize=label_size)
+    ax.set_xlabel("Session", fontsize=label_size, fontweight="bold")
     if switch:
-        plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
+        ax.set_ylabel("Unrewarded Decisions", fontsize=label_size, fontweight="bold")
     else:
-        plt.ylabel("rewards", fontweight="bold", fontsize=label_size)
+        ax.set_ylabel("Rewards", fontsize=label_size, fontweight="bold")
 
-    # y-axis min/max
-    if switch:
-        plt.ylim(min_y_habit, max_y_habit)
-    else:
-        plt.ylim(min_y_reward, max_y_reward)
+    ax.legend(fontsize=label_size, loc="upper left")
+    plt.ylim(0, 33 if switch else 30)
 
     # Adjust layout
     plt.tight_layout(
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
-        rect=[0, -0.009, 1, 1],
+        rect=[0, -0.01, 1, 1],
     )
 
-    # save fig
+    ################################################### Save Plot ###################################################
     plt.savefig("fig/__fig_shortcut_on_off__.png", dpi=300)
     plt.savefig("fig/__fig_shortcut_on_off__.pdf", format="pdf", dpi=300)
-    plt.close("all")
+    plt.close()
 
 
 #################################################################################################################
@@ -543,7 +482,7 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
         "suppression",
         "efferent",
         "passing-fibres",
-        "dbs-comb",
+        "combined",
         # "dbs-off",
     ]
 
@@ -952,7 +891,7 @@ def activity_changes_dbs_on():
             "suppression",
             "efferent",
             "passing-fibres",
-            "dbs-comb",
+            "combined",
             # "dbs-off",
         ]
 
@@ -1009,12 +948,14 @@ def activity_changes_dbs_on():
 
         # x-axis
         axs[0].set_xticks([-0.1, -0.05, 0, 0.05, 0.1])
-        axs[0].set_xticklabels(["-0.1", " ", "0", " ", "0.1"])
+        axs[0].set_xticklabels(["-0.1", " ", "0", " ", "0.1"], fontsize=label_size)
         axs[0].set_xlabel(
-            "difference to\ndbs-off", fontweight="bold", fontsize=label_size
+            "difference to\nDBS OFF", fontweight="bold", fontsize=label_size
         )
         axs[0].set_xlim(xlim_neg, xlim_pos)
         # axs[0].set_xticks([-0.1, -0.05, 0, 0.05, 0.1])
+
+        axs[0].tick_params(axis="both", labelsize=label_size)
 
         # title
         axs[0].set_title("suppression", fontweight="bold", fontsize=label_size)
@@ -1226,7 +1167,7 @@ def activity_changes_dbs_on():
         axs[3].tick_params(axis="both", labelsize=label_size)
 
         # title
-        axs[3].set_title("passing-fibres", fontweight="bold", fontsize=label_size)
+        axs[3].set_title("passing fibres", fontweight="bold", fontsize=label_size)
 
         ############# significance* ####################
         for i in range(len(mean_dbs5)):
@@ -1290,7 +1231,7 @@ def activity_changes_dbs_on():
         axs[4].tick_params(axis="both", labelsize=label_size)
 
         # title
-        axs[4].set_title("dbs-comb", fontweight="bold", fontsize=label_size)
+        axs[4].set_title("combined", fontweight="bold", fontsize=label_size)
 
         ############# significance* ####################
         for i in range(len(mean_dbs6)):
@@ -1577,7 +1518,7 @@ def gpi_scatter():
         [line],
         ["Patient Data Session 3"],
         loc="upper right",
-        fontsize=label_size,  # small
+        fontsize=label_size,
     )
 
     plt.ylim(14, 35)
@@ -1603,6 +1544,215 @@ def gpi_scatter():
 
 
 def load_simulate():
+    # number of simulations
+    number_of_simulations = 100
+    passingoff = True
+
+    ################################ load dbs-on data ###########################################
+    resultON = []
+
+    for i in range(1, 3):
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_2.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultON.append(result)
+
+    ################################ load "simulation" data #####################################
+    resultSim = []
+
+    for i in range(1, 3):
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_3.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultSim.append(result)
+
+    ################################ load "loading" data ########################################
+    resultLoad = []
+
+    for i in range(1, 3):
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_4.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultLoad.append(result)
+
+    ################################ load dbs-off data ##########################################
+    resultOFF = []
+
+    for i in range(1, 3):
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_5.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultOFF.append(result)
+
+    ###################################### edit data ############################################
+
+    index = 2
+
+    result = []
+    for i in range(index):
+        result.append([resultOFF[i], resultSim[i], resultLoad[i], resultON[i]])
+
+    ################################## prepare data for Seaborn #################################
+
+    print(result)
+
+    data = []
+    on = r"$\bf{on}$"
+    session_labels = ["off\noff", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
+    condition_labels = (
+        ["suppression", "efferent"]
+        if passingoff
+        else ["suppression", "efferent", "passing-fibres", "combined"]
+    )
+
+    for i, condition in enumerate(condition_labels):
+        for j, session in enumerate(session_labels):
+            for value in result[i][j]:
+                data.append(
+                    {"Session": session, "Condition": condition, "Value": value}
+                )
+
+    df = pd.DataFrame(data)
+
+    ################################## plot with Seaborn ########################################
+
+    sns.set(style="ticks")
+    palette = (
+        [
+            (1, 0.9, 0.9, 0.7),  # very bright red
+            (1, 0.6, 0.6, 0.7),  # bright red
+        ]
+        if passingoff
+        else [
+            (1, 0.9, 0.9, 0.7),
+            (1, 0.6, 0.6, 0.7),
+            (1, 0.4, 0.4, 0.7),
+            (0.8, 0, 0, 0.7),
+        ]
+    )
+
+    fig, ax = plt.subplots(figsize=(4, 3))
+    sns.boxplot(
+        data=df,
+        x="Session",
+        y="Value",
+        hue="Condition",
+        palette=palette,
+        showmeans=False,
+        meanprops={
+            "markerfacecolor": "black",
+            "markeredgecolor": "white",
+            "markersize": 4,
+        },
+        boxprops=dict(edgecolor="black", linewidth=1),  # Schwarzer Rahmen der Box
+        whiskerprops=dict(color="black", linewidth=1),
+        capprops=dict(color="black", linewidth=1),
+        medianprops=dict(color="black", linewidth=1),
+        flierprops={
+            "marker": "o",
+            "color": "black",
+            "markersize": 4,
+            "markeredgecolor": "black",
+            "markerfacecolor": "none",
+        },
+        linewidth=1,
+    )
+
+    for spine in ax.spines.values():
+        spine.set_linewidth(1)  # Setze die Linienstärke auf "normal"
+
+    plt.text(
+        -1.05,
+        -4.5,
+        "acute\n  history",
+        fontsize=label_size,
+        ha="center",
+        va="center",
+    )
+
+    ################################################### significance * #############################################
+
+    # function for significance over the boxplots
+    def add_star_up(ax, x1, x2, y):
+        """Add asterisks for significant differences."""
+        y_offset = 0.5
+        ax.plot(
+            [x1, x1, x2, x2],
+            [y, y + y_offset, y + y_offset, y],
+            color="black",
+            linewidth=1,
+        )
+        ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
+
+    # function for significance among the boxplots
+    def add_star_down(ax, x1, x2, y):
+        """Add asterisks for significant differences."""
+        y_offset = -0.5
+        ax.plot(
+            [x1, x1, x2, x2],
+            [y, y + y_offset, y + y_offset, y],
+            color="black",
+            linewidth=1,
+        )
+        ax.text((x1 + x2) / 2, y - 2.9, "*", fontsize=10, ha="center")
+
+    add_star_up(ax, 0.8, 2.8, 35)
+    add_star_up(ax, 1.2, 3.2, 37)
+    add_star_up(ax, -0.2, 1.80, 31)
+    add_star_up(ax, 0.2, 2.20, 33)
+    add_star_down(ax, 1.8, 2.8, 2.7)
+
+    ################################## customize plot ###########################################
+
+    ax.set_ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
+    ax.set_xlabel("")
+    ax.tick_params(axis="both", labelsize=label_size)
+    ax.set_ylim(0, 46)
+    ax.legend(loc="upper left", fontsize=label_size)
+
+    # Adjust layout
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+        rect=[-0.007, -0.008, 1, 1],
+    )
+
+    plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
+    plt.savefig("fig/__fig_load_simulate__.pdf", format="pdf", dpi=300)
+    plt.close("all")
+
+
+"""
+def load_simulate_original():
 
     # number of simulations
     number_of_simulations = 100
@@ -1705,13 +1855,15 @@ def load_simulate():
     if passingoff:
         legend = ["suppression", "efferent"]  # , "dbs-comb"]
     else:
-        legend = ["suppression", "efferent", "passing-fibres", "dbs-comb"]
+        legend = ["suppression", "efferent", "passing-fibres", "combined"]
 
     # plot size
     fig, ax = plt.subplots(figsize=(5, 3))
 
     # sessions
-    session = ["off\noff", "on\noff", "off\non", "on\non"]
+    # session = ["off\noff", "on\noff", "off\non", "on\non"]
+    on = r"$\bf{on}$"
+    session = [f"off\n{on}", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
 
     # bar positions
     x = np.arange(len(session))
@@ -1738,7 +1890,7 @@ def load_simulate():
         distance -= 1.4
 
     # settings x-axis
-    plt.xticks(x, session)
+    plt.xticks(x, session, fontsize=label_size)
     plt.text(
         -0.8,
         -4.0,
@@ -1754,7 +1906,6 @@ def load_simulate():
 
     # function for significance over the boxplots
     def add_star_up(ax, x1, x2, y):
-        """Add asterisks for significant differences."""
         y_offset = 0.5
         ax.plot(
             [x1, x1, x2, x2],
@@ -1766,7 +1917,6 @@ def load_simulate():
 
     # function for significance among the boxplots
     def add_star_down(ax, x1, x2, y):
-        """Add asterisks for significant differences."""
         y_offset = -0.5
         ax.plot(
             [x1, x1, x2, x2],
@@ -1806,6 +1956,7 @@ def load_simulate():
     plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
     plt.savefig("fig/__fig_load_simulate__.pdf", format="pdf", dpi=300)
     plt.close("all")
+    """
 
 
 #################################################################################################################
@@ -1814,6 +1965,198 @@ def load_simulate():
 
 
 def load_simulate_dbscomb():
+
+    # number of simulations
+    number_of_simulations = 100
+    passingoff = True
+
+    ################################ load dbs-on data ###########################################
+    resultON = []
+
+    for i in range(1, 6):
+        # without afferent and passing-fibres and dbs-comb
+        if i == 2:
+            continue
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_2.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultON.append(result)
+
+    ################################ load "simulation" data #####################################
+    resultSim = []
+
+    for i in range(1, 6):
+        if i == 2:
+            continue
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_3.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultSim.append(result)
+
+    ################################ load "loading" data ########################################
+    resultLoad = []
+
+    for i in range(1, 6):
+        if i == 2:
+            continue
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_4.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultLoad.append(result)
+
+    ################################ load dbs-off data ##########################################
+    resultOFF = []
+
+    for i in range(1, 6):
+        if i == 2:
+            continue
+        if i == 3:
+            continue
+        if i == 4 and passingoff:
+            continue
+
+        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_5.json"
+        result = stat.read_json_data(filepath)
+        result = stat.processing_habit_session3(result, number_of_simulations)
+        result = result.T
+        result = result[0].tolist()
+        resultOFF.append(result)
+
+    ###################################### edit data ############################################
+
+    # if passingoff:
+    #    index = 3
+    # else:
+    #    index = 4
+
+    index = 2
+
+    result = []
+    for i in range(index):
+        result.append([resultOFF[i], resultSim[i], resultLoad[i], resultON[i]])
+
+    ################################## prepare data for Seaborn #################################
+
+    print(result)
+
+    data = []
+    on = r"$\bf{on}$"
+    session_labels = ["off\noff", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
+    condition_labels = (
+        ["suppression", "combined"]
+        if passingoff
+        else ["suppression", "efferent", "passing-fibres", "combined"]
+    )
+
+    for i, condition in enumerate(condition_labels):
+        for j, session in enumerate(session_labels):
+            for value in result[i][j]:
+                data.append(
+                    {"Session": session, "Condition": condition, "Value": value}
+                )
+
+    df = pd.DataFrame(data)
+
+    ################################## plot with Seaborn ########################################
+
+    sns.set(style="ticks")
+    palette = (
+        [
+            (1, 0.9, 0.9, 0.7),  # very bright red
+            (0.8, 0, 0, 0.7),  # darkred
+        ]
+        if passingoff
+        else [
+            (1, 0.9, 0.9, 0.7),
+            (1, 0.6, 0.6, 0.7),
+            (1, 0.4, 0.4, 0.7),
+            (0.8, 0, 0, 0.7),
+        ]
+    )
+
+    fig, ax = plt.subplots(figsize=(4, 3))
+    sns.boxplot(
+        data=df,
+        x="Session",
+        y="Value",
+        hue="Condition",
+        palette=palette,
+        showmeans=False,
+        meanprops={
+            "markerfacecolor": "black",
+            "markeredgecolor": "white",
+            "markersize": 4,
+        },
+        boxprops=dict(edgecolor="black", linewidth=1),  # Schwarzer Rahmen der Box
+        whiskerprops=dict(color="black", linewidth=1),
+        capprops=dict(color="black", linewidth=1),
+        medianprops=dict(color="black", linewidth=1),
+        flierprops={
+            "marker": "o",
+            "color": "black",
+            "markersize": 4,
+            "markeredgecolor": "black",
+            "markerfacecolor": "none",
+        },
+        linewidth=1,
+    )
+
+    for spine in ax.spines.values():
+        spine.set_linewidth(1)  # Setze die Linienstärke auf "normal"
+
+    plt.text(
+        -0.8,
+        -4.5,
+        "acute\n  history",
+        fontsize=label_size,
+        ha="center",
+        va="center",
+    )
+
+    ################################## customize plot ###########################################
+
+    ax.set_ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
+    ax.set_xlabel("")
+    ax.tick_params(axis="both", labelsize=label_size)
+    ax.set_ylim(0, 46)
+    ax.legend(loc="upper left", fontsize=label_size)
+
+    # Adjust layout
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+        rect=[-0.002, -0.008, 1, 1],
+    )
+
+    plt.savefig("fig/__fig_load_simulate_combined__.png", dpi=300)
+    plt.savefig("fig/__fig_load_simulate_combined__.pdf", format="pdf", dpi=300)
+    plt.close("all")
+
+
+"""
+def load_simulate_dbscomb_original():
 
     # number of simulations
     number_of_simulations = 100
@@ -1927,15 +2270,16 @@ def load_simulate_dbscomb():
 
     # legend
     if passingoff:
-        legend = ["suppression", "dbs-comb"]
+        legend = ["suppression", "combined"]
     else:
-        legend = ["suppression", "efferent", "passing-fibres", "dbs-comb"]
+        legend = ["suppression", "efferent", "passing-fibres", "combined"]
 
     # plot size
     fig, ax = plt.subplots(figsize=(5, 3))
 
     # sessions
-    session = ["off\noff", "on\noff", "off\non", "on\non"]
+    on = r"$\bf{on}$"
+    session = [f"off\n{on}", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
 
     # bar positions
     x = np.arange(len(session))
@@ -1962,7 +2306,7 @@ def load_simulate_dbscomb():
         distance -= 1.4
 
     # settings x-axis
-    plt.xticks(x, session)
+    plt.xticks(x, session, fontsize=label_size)
     plt.text(
         -0.8,
         -4.0,
@@ -1996,6 +2340,7 @@ def load_simulate_dbscomb():
     plt.savefig("fig/__fig_load_simulate_dbscomb__.png", dpi=300)
     plt.savefig("fig/__fig_load_simulate_dbscomb__.pdf", format="pdf", dpi=300)
     plt.close("all")
+"""
 
 
 #################################################################################################################
@@ -2015,7 +2360,7 @@ def dbs_parameter():
         "suppression",
         "efferent",
         "afferent",
-        "passing fibres GPe-STN",
+        "passing fibres",
     ]
 
     parameter_name = [
@@ -2137,7 +2482,7 @@ def dbs_parameter():
         if i == "afferent":
             data = data_afferent
             param = param_afferent
-        if i == "passing fibres GPe-STN":
+        if i == "passing fibres":
             data = data_passing_fibres
             param = param_passing_fibres
 
@@ -2253,7 +2598,7 @@ def parameter_gpi_inhib():
         "suppression",
         "efferent",
         "afferent",
-        "passing fibres GPe-STN",
+        "passing fibres",
     ]
 
     parameter_name = [
@@ -2389,7 +2734,7 @@ def parameter_gpi_inhib():
         if i == "afferent":
             data = [mean_afferent, data_GPi_afferent]
             param = param_afferent
-        if i == "passing fibres GPe-STN":
+        if i == "passing fibres":
             data = [mean_passing_fibres, data_GPi_passing_fibres]
             param = param_passing_fibres
 
@@ -2440,7 +2785,7 @@ def parameter_gpi_inhib():
         ax2.tick_params(axis="both", which="major", labelsize=label_size)
         ax2.set_xlabel(parameter_name[idx - 1])
         ax2.set_title(i, fontweight="bold", fontsize=label_size)
-        if i == "efferent" or i == "passing fibres GPe-STN":
+        if i == "efferent" or i == "passing fibres":
             ax2.set_ylabel("average rate", fontweight="bold", fontsize=label_size)
         else:
             ax2.set_yticklabels([])
@@ -2553,13 +2898,13 @@ def get_w_hyperdirect(loaded_variables, dbs_state, sim_id, trial):
 
 def weights_over_time_boxplots(
     df,
-    specific_dbs_types=["suppression", "efferent", "dbs-comb", "OFF"],
+    specific_dbs_types=["suppression", "efferent", "combined", "OFF"],
     specific_sessions=[3],
 ):
     df = df.copy()
-    # Remove all rows where dbs_state is OFF and dbs_type is not dbs-comb (i.e. only
-    # keep OFF for dbs_type dbs-comb)
-    df = df[~((df["dbs_state"] == "OFF") & (df["dbs_type"] != "dbs-comb"))]
+    # Remove all rows where dbs_state is OFF and dbs_type is not combined (i.e. only
+    # keep OFF for dbs_type combined)
+    df = df[~((df["dbs_state"] == "OFF") & (df["dbs_type"] != "combined"))]
 
     # For the rows in which dbs_state is OFF change the dbs_type to OFF
     df.loc[df["dbs_state"] == "OFF", "dbs_type"] = "OFF"
@@ -2593,7 +2938,7 @@ def weights_over_time_boxplots(
     ]
 
     # Set up the matplotlib figure
-    fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(15, 15))
+    fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(6, 6))
     axes = axes.flatten()
 
     # Create a boxplot for each weight type
@@ -2611,16 +2956,18 @@ def weights_over_time_boxplots(
         df_filtered_plot = df_filtered_plot.groupby(
             ["sim_id", "dbs_type", "session", "pathway", "channel"], as_index=False
         ).mean()
-        axes = sns.boxplot(
+
+        # Create boxplot without overwriting axes
+        ax = sns.boxplot(
             x=x,
             y="w",
             hue=hue,
             palette={
                 "suppression": (1, 0.7, 0.7, 0.8),
                 "efferent": (1, 0.5, 0.5, 0.8),
-                "dbs-comb": (0.8, 0, 0, 0.8),
+                "combined": (0.8, 0, 0, 0.8),
                 "OFF": "darkblue",
-                "passing": "yellow",
+                "passing fibres": "yellow",
                 "afferent": "green",
             },
             data=df_filtered_plot,
@@ -2630,13 +2977,17 @@ def weights_over_time_boxplots(
                 "markerfacecolor": "black",
                 "markeredgecolor": "white",
             },
-            # linecolor="black",
             order=order,
             hue_order=hue_order,
         )
+
         axes[i].set_title(weight_type)
+
+        # Remove legend if more than one session
         if len(specific_sessions) > 1:
             axes[i].legend_.remove()  # Remove individual legends
+
+        # axes[i].tick_params(axis="both", labelsize=label_size)
 
         # # make pariwise tests and annotate
         # if len(specific_sessions) == 1:
@@ -2644,7 +2995,7 @@ def weights_over_time_boxplots(
         #     pairs = [
         #         ("suppression", "OFF"),
         #         ("efferent", "OFF"),
-        #         ("dbs-comb", "OFF"),
+        #         ("combined", "OFF"),
         #     ]
 
         #     # make pairwise tests
@@ -2656,7 +3007,13 @@ def weights_over_time_boxplots(
     if len(specific_sessions) > 1:
         # Create a single legend outside the subplots
         handles, labels = axes[0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc="upper center", ncol=len(specific_dbs_types))
+        fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            ncol=len(specific_dbs_types),
+            fontsize=label_size,
+        )
 
     # Adjust layout
     if len(specific_sessions) > 1:
@@ -2674,7 +3031,7 @@ def get_weights_over_time_data_frame(
     n_sims, w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict
 ):
     # create a pandas dataframe with columns "w", "sim_id", "dbs_type" (suppression,
-    # efferent, afferent, passing, dbs-comb), "dbs_state" (ON, OFF), "session" (1,2,3),
+    # efferent, afferent, passing fibres, combined), "dbs_state" (ON, OFF), "session" (1,2,3),
     # "pathway" (direct, indirect, hyperdirect, shortcut, dopa_predict), "channel" (0, 1)
     # and "trial" (0-119)
     df = {
@@ -2701,9 +3058,9 @@ def get_weights_over_time_data_frame(
             for dbs_type in [
                 "suppression",
                 "efferent",
-                "dbs-comb",
+                "combined",
                 "afferent",
-                "passing",
+                "passing fibres",
             ]:
                 for session in [1, 2, 3]:
                     if dbs_state == "OFF":
@@ -2713,8 +3070,8 @@ def get_weights_over_time_data_frame(
                             "suppression": 1,
                             "efferent": 2,
                             "afferent": 3,
-                            "passing": 4,
-                            "dbs-comb": 5,
+                            "passing fibres": 4,
+                            "combined": 5,
                         }[dbs_type]
                     # each session has 40 trials
                     trial_idx_start = (session - 1) * 40
@@ -2755,7 +3112,7 @@ def get_weights_over_time_data_frame(
 
 def get_weights_over_time_arrays(n_sims, n_dbs, n_trials):
     # we have weights for each sim (0-99), shortcut (0-fixed,1-plastic), dbs state
-    # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing,5-dbs-comb)
+    # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing fibres,5-combined)
 
     name_list = []
     for sim_id in range(n_sims):
@@ -2866,7 +3223,7 @@ def weights_over_time_lineplots_old(
         ["efferent", True],
         ["afferent", False],
         ["passing fibres GPe-STN", False],
-        ["dbs-comb", True],
+        ["combined", True],
     ]
 
     fig, axes = plt.subplots(4, 2, figsize=(12, 8))
@@ -2901,9 +3258,9 @@ def weights_over_time_lineplots_old(
                     )
             # Set title and labels
             if title != "":
-                ax.set_title(title)
+                ax.set_title(title, fontsize=label_size)
             if ylabel != "":
-                ax.set_ylabel(ylabel)
+                ax.set_ylabel(ylabel, fontsize=label_size)
             # Setting y-axis tick format to two decimal places
             ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f"{val:.2f}"))
             # for last subplot add legend
@@ -2986,7 +3343,7 @@ def weights_over_time_lineplots(data):
                 hue="dbs_state",
                 style="channel",
                 ax=ax,
-                palette={"ON": "red", "OFF": "blue"},
+                palette={"ON": (0.8, 0, 0, 0.7), "OFF": lighter_darkblue},
             )
 
             # horizontal line at 0, vertical lines at 40 and 80
@@ -3056,12 +3413,13 @@ def weights_over_time_lineplots(data):
     print(column_headings_dict)
     heading_new_text_dict = {
         "dbs_state": "DBS",
-        "channel": "Channel",
+        "channel": "Option",
     }
 
     # Make column headings bold
     for heading_text, heading in column_headings_dict.items():
         heading.set_fontweight("bold")
+        heading.set_fontsize(font_size)
         # change text of the column headings
         heading.set_text(heading_new_text_dict[heading_text])
 
@@ -3077,7 +3435,7 @@ def weights_over_time_lineplots(data):
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
-        rect=[-0.02 / m, legend_bbox.y1, 1.0 - 0.0035 / m, 1],
+        rect=[-0.03 / m, legend_bbox.y1, 1.0 - 0.0035 / m, 1],
     )
 
     # create save string which contains the first letters of the used dbs_types
@@ -3104,28 +3462,31 @@ def weights_over_time():
     df = get_weights_over_time_data_frame(
         n_sims, w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict
     )
-
+    """
     # Plot weights over time as lineplots
     weights_over_time_lineplots_old(
         w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict, n_dbs
     )
-    # do the new lineplots only for the dbs_types
-    # ["suppression", "efferent", "dbs-comb"]
-    weights_over_time_lineplots(
-        df[df["dbs_type"].isin(["suppression", "efferent", "dbs-comb"])]
-    )
-    # ["passing", "afferent"]
-    weights_over_time_lineplots(df[df["dbs_type"].isin(["passing", "afferent"])])
+    """
 
+    # do the new lineplots only for the dbs_types
+    # ["suppression", "efferent", "combined"]
+    weights_over_time_lineplots(
+        df[df["dbs_type"].isin(["suppression", "efferent", "combined"])]
+    )
+    # ["passing fibres", "afferent"]
+    weights_over_time_lineplots(df[df["dbs_type"].isin(["passing fibres", "afferent"])])
+
+    """
     # Create boxplots for all dbs types and sessions
     weights_over_time_boxplots(
         df,
         specific_dbs_types=[
             "suppression",
             "efferent",
-            "dbs-comb",
+            "combined",
             "afferent",
-            "passing",
+            "passing fibres",
             "OFF",
         ],
         specific_sessions=[1, 2, 3],
@@ -3133,15 +3494,16 @@ def weights_over_time():
     # Only for specific dbs types
     weights_over_time_boxplots(
         df,
-        specific_dbs_types=["suppression", "efferent", "dbs-comb", "OFF"],
+        specific_dbs_types=["suppression", "efferent", "combined", "OFF"],
         specific_sessions=[1, 2, 3],
     )
     # Only for session 3
     weights_over_time_boxplots(
         df,
-        specific_dbs_types=["suppression", "efferent", "dbs-comb", "OFF"],
+        specific_dbs_types=["suppression", "efferent", "combined", "OFF"],
         specific_sessions=[3],
     )
+    """
 
 
 #################################################################################################################
@@ -3170,7 +3532,7 @@ def support_over_time(shortcut=True, for_selected=True):
         "efferent",
         "afferent",
         "passing fibres GPe-STN",
-        "dbs-comb",
+        "combined",
     ]
 
     support_exc_plot_dict = {
@@ -3295,7 +3657,7 @@ def support_over_time(shortcut=True, for_selected=True):
             palette={
                 "suppression": (1, 0.7, 0.7, 0.8),
                 "efferent": (1, 0.5, 0.5, 0.8),
-                "dbs-comb": (0.8, 0, 0, 0.8),
+                "combined": (0.8, 0, 0, 0.8),
                 "dbs-off": lighter_darkblue,
             },
             data=support_exc_df,
@@ -3323,12 +3685,18 @@ def support_over_time(shortcut=True, for_selected=True):
 
         # labels
         ax1.set_ylabel(
-            "shortcuts' support for selected", fontweight="bold", fontsize=label_size
+            "shortcut's support for selected", fontweight="bold", fontsize=label_size
         )
         ax1.set_xlabel("")
 
         # legend
-        ax1.legend(loc="upper left", fontsize=label_size)
+        handles, labels = ax1.get_legend_handles_labels()  # Hol die Handles und Labels
+        labels = [
+            label.replace("dbs-off", "DBS OFF") for label in labels
+        ]  # Label ändern
+        ax1.legend(
+            handles, labels, loc="upper left", fontsize=label_size
+        )  # Neue Legende setze
 
         ##################### support_inh_plot_ ########################
         ax2 = sns.boxplot(
@@ -3338,7 +3706,7 @@ def support_over_time(shortcut=True, for_selected=True):
             palette={
                 "suppression": (1, 0.7, 0.7, 0.8),
                 "efferent": (1, 0.5, 0.5, 0.8),
-                "dbs-comb": (0.8, 0, 0, 0.8),
+                "combined": (0.8, 0, 0, 0.8),
                 "dbs-off": lighter_darkblue,
             },
             data=support_inh_df,
@@ -3396,7 +3764,7 @@ def support_over_time(shortcut=True, for_selected=True):
 
             y_offset = 0.01
 
-            # dbs-off -> supression, efferent, dbs-comb
+            # dbs-off -> supression, efferent, combined
             if efferent:
                 for i in range(3):
                     if i == 0:
@@ -3486,7 +3854,7 @@ def support_over_time(shortcut=True, for_selected=True):
 
         # use seaborns relplot to plot the data with x="bin", y="support",
         # hue="support_type", col="dbs_state"
-        fig = plt.figure(figsize=(6.5, 3))
+        fig = plt.figure(figsize=(6, 3))
         ax = sns.relplot(
             x="bin",
             y="support",
@@ -3494,17 +3862,36 @@ def support_over_time(shortcut=True, for_selected=True):
             col="dbs_state",
             kind="line",
             data=support_df_dbs,
-            palette={"shortcut": "red", "basal ganglia": "blue"},
+            palette={"shortcut": (0.8, 0, 0, 0.7), "basal ganglia": lighter_darkblue},
+            height=2.5,  # Höhe des Plots
+            aspect=1,  # Verhältnis der Breite zur Höhe
         )
 
-        # dbs-states layout
-        ax.set_titles(col_template="{col_name}", fontweight="bold", fontsize=label_size)
+        # Entferne die Titel
+        ax.set_titles("")  # Leerer Titel für alle Subplots
+
+        # plot labels
+        label = ["A", "B", "C", "D"]
+        for i, ax_sub in enumerate(ax.axes.flat):
+            ax_sub.text(
+                0.04,
+                0.9,
+                label[i],
+                fontsize=11,
+                transform=ax_sub.transAxes,
+            )
 
         for ax_sub in ax.axes.flat:
-            ax_sub.set_xlabel("trial", fontweight="bold", fontsize=label_size)
-            ax_sub.set_ylabel("support", fontweight="bold", fontsize=label_size)
-            ax_sub.tick_params(axis="x", labelsize=label_size)
-            ax_sub.tick_params(axis="y", labelsize=label_size)
+            ax_sub.set_xlabel(
+                "Trial", fontweight="bold", fontsize=label_size
+            )  # Achsenbeschriftung x
+            ax_sub.set_ylabel(
+                "support", fontweight="bold", fontsize=label_size
+            )  # Achsenbeschriftung y
+
+            # Stelle sicher, dass die Tick-Schriftgröße auf allen Achsen gesetzt wird
+            ax_sub.tick_params(axis="x", labelsize=label_size)  # x-Achsen Ticks
+            ax_sub.tick_params(axis="y", labelsize=label_size)  # y-Achsen Ticks
 
         # Extrahiere die Handles und Labels der Legende
         handles, labels = ax.legend.legend_handles, [
@@ -3660,4 +4047,4 @@ if __name__ == "__main__":
         support_over_time(shortcut=True)
         support_over_time(shortcut=False)
         # plot support for "action 0" for plastic shortcut
-        # support_over_time(shortcut=True, for_selected=False)
+        support_over_time(shortcut=True, for_selected=False)

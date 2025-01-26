@@ -2241,7 +2241,7 @@ def load_data_previously_selected(
         if dbs_state == "OFF":
             dbs_load = 0
         elif dbs_state == "ON":
-            dbs_load = {"suppression": 1, "efferent": 2, "dbs-comb": 5}[dbs_variant]
+            dbs_load = {"suppression": 1, "efferent": 2, "combined": 5}[dbs_variant]
         file_name = (
             lambda sim_id: f"data/simulation_data/choices_rewards_per_trial_Shortcut{shortcut_load}_DBS_State{dbs_load}_sim{sim_id}.pkl"
         )
