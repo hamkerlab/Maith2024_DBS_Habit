@@ -1684,9 +1684,18 @@ if __name__ == "__main__":
                     "markersize": 4
                 },
                 linecolor="black",
+                boxprops=dict(edgecolor="black", linewidth=1),
+                whiskerprops=dict(color="black", linewidth=1),
+                capprops=dict(color="black", linewidth=1),
+                medianprops=dict(color="black", linewidth=1),
                 flierprops={
-                    "markersize": 4               
+                    "marker": "o",
+                    "color": "black",
+                    "markersize": 4,
+                    "markeredgecolor": "black",
+                    "markerfacecolor": "none",
                 },
+                linewidth=1,
                 ax=axes[idx],
             )
             

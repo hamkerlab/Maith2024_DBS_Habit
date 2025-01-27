@@ -15,7 +15,7 @@ from statsmodels.stats.multitest import multipletests
 
 __fig_shortcut_on_off_line__ = False
 __fig_shortcut_on_off__ = False
-__fig_dbs_on_off_14_and_100__ = False
+# __fig_dbs_on_off_14_and_100__ = False
 __fig_activity_changes_dbs_on__ = False
 __fig_activity_changes_dbs_off__ = False
 __fig_gpi_scatter__ = False
@@ -25,10 +25,12 @@ __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
 __fig_weights_over_time__ = False
 __fig_support_over_time__ = False
+__fig_simulation_data_difference_dbs_on_off_100__ = False
+__fig_patients_vs_sims__ = False
 
 
 ##############################################################################
-############################# scale y-axis ###################################
+################################# settings ###################################
 ##############################################################################
 
 min_y_reward = 0
@@ -106,6 +108,10 @@ def shortcut_on_off(switch, number_of_simulations):
             "markeredgecolor": "white",
             "markersize": 4,
         },
+        boxprops=dict(edgecolor="black", linewidth=1),
+        whiskerprops=dict(color="black", linewidth=1),
+        capprops=dict(color="black", linewidth=1),
+        medianprops=dict(color="black", linewidth=1),
         flierprops={
             "marker": "o",
             "color": "black",
@@ -136,7 +142,7 @@ def shortcut_on_off(switch, number_of_simulations):
     ax.tick_params(axis="both", labelsize=label_size)
     ax.set_xlabel("Session", fontsize=label_size, fontweight="bold")
     if switch:
-        ax.set_ylabel("Unrewarded Decisions", fontsize=label_size, fontweight="bold")
+        ax.set_ylabel("unrewarded decisions", fontsize=label_size, fontweight="bold")
     else:
         ax.set_ylabel("Rewards", fontsize=label_size, fontweight="bold")
 
@@ -1312,8 +1318,6 @@ def activity_changes_dbs_off():
         # concatenate data
         data_dbs1 = np.array(data_dbs1).T
 
-        # print("\n", data_dbs1, "\n")
-
         ####################################### mean / standarderror N=100 #############################################
 
         # means
@@ -1622,8 +1626,6 @@ def load_simulate():
 
     ################################## prepare data for Seaborn #################################
 
-    print(result)
-
     data = []
     on = r"$\bf{on}$"
     session_labels = ["off\noff", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
@@ -1672,7 +1674,7 @@ def load_simulate():
             "markeredgecolor": "white",
             "markersize": 4,
         },
-        boxprops=dict(edgecolor="black", linewidth=1),  # Schwarzer Rahmen der Box
+        boxprops=dict(edgecolor="black", linewidth=1),
         whiskerprops=dict(color="black", linewidth=1),
         capprops=dict(color="black", linewidth=1),
         medianprops=dict(color="black", linewidth=1),
@@ -1687,7 +1689,7 @@ def load_simulate():
     )
 
     for spine in ax.spines.values():
-        spine.set_linewidth(1)  # Setze die Linienstärke auf "normal"
+        spine.set_linewidth(1)
 
     plt.text(
         -1.05,
@@ -2058,8 +2060,6 @@ def load_simulate_dbscomb():
 
     ################################## prepare data for Seaborn #################################
 
-    print(result)
-
     data = []
     on = r"$\bf{on}$"
     session_labels = ["off\noff", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
@@ -2108,7 +2108,7 @@ def load_simulate_dbscomb():
             "markeredgecolor": "white",
             "markersize": 4,
         },
-        boxprops=dict(edgecolor="black", linewidth=1),  # Schwarzer Rahmen der Box
+        boxprops=dict(edgecolor="black", linewidth=1),
         whiskerprops=dict(color="black", linewidth=1),
         capprops=dict(color="black", linewidth=1),
         medianprops=dict(color="black", linewidth=1),
@@ -2123,7 +2123,7 @@ def load_simulate_dbscomb():
     )
 
     for spine in ax.spines.values():
-        spine.set_linewidth(1)  # Setze die Linienstärke auf "normal"
+        spine.set_linewidth(1)
 
     plt.text(
         -0.8,
@@ -3409,8 +3409,8 @@ def weights_over_time_lineplots(data):
         for legend_text in legend_texts
         if legend_text.get_text() in ["dbs_state", "channel"]
     }
-    print(legend_texts)
-    print(column_headings_dict)
+    # print(legend_texts)
+    # print(column_headings_dict)
     heading_new_text_dict = {
         "dbs_state": "DBS",
         "channel": "Option",
@@ -3435,7 +3435,7 @@ def weights_over_time_lineplots(data):
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
-        rect=[-0.03 / m, legend_bbox.y1, 1.0 - 0.0035 / m, 1],
+        rect=[0 / m, legend_bbox.y1, 1.0 - 0.0035 / m, 1],
     )
 
     # create save string which contains the first letters of the used dbs_types
@@ -3667,6 +3667,10 @@ def support_over_time(shortcut=True, for_selected=True):
                 "markerfacecolor": "black",
                 "markeredgecolor": "white",
             },
+            boxprops=dict(edgecolor="black", linewidth=1),
+            whiskerprops=dict(color="black", linewidth=1),
+            capprops=dict(color="black", linewidth=1),
+            medianprops=dict(color="black", linewidth=1),
             flierprops={
                 "marker": "o",
                 "color": "black",
@@ -3674,6 +3678,7 @@ def support_over_time(shortcut=True, for_selected=True):
                 "markeredgecolor": "black",
                 "markerfacecolor": "none",
             },
+            linewidth=1,
         )
 
         ax1.axhline(0, color="black", linestyle="--", alpha=0.5)
@@ -3716,6 +3721,10 @@ def support_over_time(shortcut=True, for_selected=True):
                 "markerfacecolor": "black",
                 "markeredgecolor": "white",
             },
+            boxprops=dict(edgecolor="black", linewidth=1),
+            whiskerprops=dict(color="black", linewidth=1),
+            capprops=dict(color="black", linewidth=1),
+            medianprops=dict(color="black", linewidth=1),
             flierprops={
                 "marker": "o",
                 "color": "black",
@@ -3723,6 +3732,7 @@ def support_over_time(shortcut=True, for_selected=True):
                 "markeredgecolor": "black",
                 "markerfacecolor": "none",
             },
+            linewidth=1,
         )
         ax2.axhline(0, color="black", linestyle="--", alpha=0.5)
 
@@ -4002,6 +4012,800 @@ def support_over_time(shortcut=True, for_selected=True):
                 fh.write(p_values_corrected_df.round(3).to_string())
 
 
+#####################################################################################################
+########################### fig_simulation_data_difference_dbs_on_off_100 ###########################
+#####################################################################################################
+
+
+def fig_simulation_data_difference_dbs_on_off_100(number_of_persons):
+
+    ####################################### settings #########################################
+    label_size = 9
+
+    ##################################### prepare data  ######################################
+
+    # compare dbs on vs off and different dbs types for plastic and fixed shortcut
+    data_df_full_sims_dict = {}
+    data_df_full_sims_dict["plastic"] = stat.dbs_on_vs_off(
+        number_of_persons, shortcut=True
+    )
+    data_df_full_sims_dict["fixed"] = stat.dbs_on_vs_off(
+        number_of_persons, shortcut=False
+    )
+
+    # create a plot comparing dbs_states of simulations
+    # for this plot combine fixed and plastic shortcut data with a new column "shortcut_type"
+    data_df_full_sims_dict["plastic"]["shortcut_type"] = "plastic"
+    data_df_full_sims_dict["fixed"]["shortcut_type"] = "fixed"
+    data_df_full_sims_compare_dbs = pd.concat(
+        [data_df_full_sims_dict["plastic"], data_df_full_sims_dict["fixed"]]
+    )
+    # exclude afferent
+    data_df_full_sims_compare_dbs = data_df_full_sims_compare_dbs[
+        data_df_full_sims_compare_dbs["dbs_state"] != "afferent"
+    ]
+    # order the dbs states (dbs-off, suppression, efferent, passing fibres, dbs-comb)
+    data_df_full_sims_compare_dbs["dbs_state"] = pd.Categorical(
+        data_df_full_sims_compare_dbs["dbs_state"],
+        categories=[
+            "dbs-off",
+            "suppression",
+            "efferent",
+            "passing fibres",
+            "dbs-comb",
+        ],
+        ordered=True,
+    )
+
+    ####################### plot fig/simulation_data_difference_dbs_on_off_100  ############################
+
+    # 2 (plastic/fixed) times n (number of sessions) subplots
+    fig_compare_dbs, axs_compare_dbs = plt.subplots(
+        nrows=2,
+        ncols=1,
+        figsize=(16 / 2.54, 14 / 2.54),
+        sharex=True,
+        sharey=True,
+    )
+
+    # for loop over shortcut_type
+    for shortcut_type_id, shortcut_type in enumerate(["plastic", "fixed"]):
+
+        # boxplot with x=shortcut_type, y=unrewarded_decisions, hue=dbs_state
+        sns.boxplot(
+            data=data_df_full_sims_compare_dbs[
+                data_df_full_sims_compare_dbs["shortcut_type"] == shortcut_type
+            ],
+            x="session",
+            y="unrewarded_decisions",
+            hue="dbs_state",
+            hue_order=[
+                "dbs-off",
+                "suppression",
+                "efferent",
+                "passing fibres",
+                "dbs-comb",
+            ],
+            ax=axs_compare_dbs[shortcut_type_id],
+            palette={
+                "suppression": (1, 0.7, 0.7, 0.8),
+                "efferent": (1, 0.5, 0.5, 0.8),
+                "dbs-comb": (0.8, 0, 0, 0.8),
+                "dbs-off": (0, 0, 0.65),
+                "passing fibres": (1, 0.3, 0.3, 0.8),
+            },
+            boxprops=dict(edgecolor="black", linewidth=1),
+            whiskerprops=dict(color="black", linewidth=1),
+            capprops=dict(color="black", linewidth=1),
+            medianprops=dict(color="black", linewidth=1),
+            flierprops={
+                "marker": "o",
+                "color": "black",
+                "markersize": 4,
+                "markeredgecolor": "black",
+                "markerfacecolor": "none",
+            },
+            linewidth=1,
+        )
+
+        ################ axis settings #####################
+
+        axs_compare_dbs[shortcut_type_id].tick_params(axis="both", labelsize=label_size)
+        axs_compare_dbs[shortcut_type_id].set_ylabel(
+            "unrewarded decisions", fontweight="bold", fontsize=label_size
+        )
+        axs_compare_dbs[shortcut_type_id].set_xlabel(
+            "Session", fontweight="bold", fontsize=label_size
+        )
+        if shortcut_type_id == 0:
+            axs_compare_dbs[shortcut_type_id].set_xticklabels([])
+            axs_compare_dbs[shortcut_type_id].set_xlabel("")
+            axs_compare_dbs[shortcut_type_id].get_legend().remove()
+
+        ################# significance * #################
+
+        # function for significance over the boxplots
+        def add_star(ax, x1, x2, y):
+            """Add asterisks for significant differences."""
+            y_offset = 0.5
+            ax.plot(
+                [x1, x1, x2, x2],
+                [y, y + y_offset, y + y_offset, y],
+                color="black",
+                linewidth=1,
+            )
+            ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
+
+        if shortcut_type_id == 0:
+            add_star(axs_compare_dbs[shortcut_type_id], 1.68, 1.84, 33)
+            add_star(axs_compare_dbs[shortcut_type_id], 1.68, 2.16, 35)
+            add_star(axs_compare_dbs[shortcut_type_id], 1.68, 2.32, 37)
+        else:
+            add_star(axs_compare_dbs[shortcut_type_id], 0.68, 0.84, 27)
+            add_star(axs_compare_dbs[shortcut_type_id], 0.68, 1.16, 29)
+            add_star(axs_compare_dbs[shortcut_type_id], 0.68, 1.32, 31)
+            add_star(axs_compare_dbs[shortcut_type_id], 1.68, 2.32, 16)
+
+    ############## legend #################
+
+    handles, labels = axs_compare_dbs[0].get_legend_handles_labels()
+
+    label_mapping = {
+        "dbs-off": "DBS OFF",
+        "dbs-comb": "combined",
+    }
+    labels = [label_mapping.get(label, label) for label in labels]
+
+    for ax in axs_compare_dbs:
+        ax.legend().remove()
+
+    fig = plt.gcf()
+    legend = fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=3,
+        fontsize=label_size,
+        bbox_to_anchor=(0.5, -0.01),
+    )
+
+    # get the coordinates of the legend box
+    legend_bbox = legend.get_window_extent()
+    legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
+
+    ############### layout ################
+
+    plt.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+        rect=[0, legend_bbox.y1 + 0.01, 1, 1],
+    )
+
+    # plot labels
+    plt.text(0.005, 0.975, "A", transform=plt.gcf().transFigure, fontsize=11)
+    plt.text(0.005, 0.535, "B", transform=plt.gcf().transFigure, fontsize=11)
+
+    ############# save fig ################
+    fig.savefig(
+        f"fig/simulation_data_difference_dbs_on_off_{number_of_persons}.png", dpi=300
+    )
+    fig.savefig(
+        f"fig/simulation_data_difference_dbs_on_off_{number_of_persons}.pdf",
+        format="pdf",
+        dpi=300,
+    )
+    plt.close(fig)
+
+
+#####################################################################################################
+#################################### fig_patient_vs_sims ############################################
+#####################################################################################################
+
+
+def fig_patients_vs_sims(number_of_persons):
+
+    ####################################### settings #########################################
+    label_size = 9
+
+    ##################################### prepare data  ######################################
+
+    # compare dbs on vs off and different dbs types for plastic and fixed shortcut
+    data_df_full_sims_dict = {}
+    data_df_full_sims_dict["plastic"] = stat.dbs_on_vs_off(
+        number_of_persons, shortcut=True
+    )
+    data_df_full_sims_dict["fixed"] = stat.dbs_on_vs_off(
+        number_of_persons, shortcut=False
+    )
+
+    # create a plot comparing dbs_states of simulations
+    # for this plot combine fixed and plastic shortcut data with a new column "shortcut_type"
+    data_df_full_sims_dict["plastic"]["shortcut_type"] = "plastic"
+    data_df_full_sims_dict["fixed"]["shortcut_type"] = "fixed"
+    data_df_full_sims_compare_dbs = pd.concat(
+        [data_df_full_sims_dict["plastic"], data_df_full_sims_dict["fixed"]]
+    )
+    # exclude afferent
+    data_df_full_sims_compare_dbs = data_df_full_sims_compare_dbs[
+        data_df_full_sims_compare_dbs["dbs_state"] != "afferent"
+    ]
+    # order the dbs states (dbs-off, suppression, efferent, passing fibres, dbs-comb)
+    data_df_full_sims_compare_dbs["dbs_state"] = pd.Categorical(
+        data_df_full_sims_compare_dbs["dbs_state"],
+        categories=[
+            "dbs-off",
+            "suppression",
+            "efferent",
+            "passing fibres",
+            "dbs-comb",
+        ],
+        ordered=True,
+    )
+
+    # also perform the analysis for the patient data and compare patients with sims
+    data_df_full_patients = stat.dbs_on_vs_off(number_of_persons=None)
+
+    # change the values of the column subject to "patient X" and "simulation X"
+    # where X is the previous value of the subject column
+    data_df_full_patients["subject"] = "patients " + data_df_full_patients[
+        "subject"
+    ].astype(str)
+    data_df_full_sims_dict["plastic"]["subject"] = (
+        "simulations " + data_df_full_sims_dict["plastic"]["subject"].astype(str)
+    )
+    data_df_full_sims_dict["fixed"]["subject"] = (
+        "simulations " + data_df_full_sims_dict["fixed"]["subject"].astype(str)
+    )
+
+    # create a figure with m (number of sessions) times 2 (plastic/fixed)
+    # subplots
+    fig_fixed_and_plastic, axs_fixed_and_plastic = plt.subplots(
+        nrows=1,
+        ncols=len(data_df_full_sims_dict["plastic"]["session"].unique()) + 1,
+        figsize=(19 / 2.54, 7 / 2.54),
+        sharex=True,
+        sharey=True,
+    )
+
+    # loop over plastic and fixed shortcut
+    for shortcut_type_id, shortcut_type in enumerate(["plastic", "fixed"]):
+
+        # create a figure with n (number dbs_states - 2) time m (number of sessions)
+        # subplots
+        fig_full, axs_full = plt.subplots(
+            nrows=len(data_df_full_sims_dict["plastic"]["dbs_state"].unique()) - 2,
+            ncols=len(data_df_full_sims_dict["plastic"]["session"].unique()),
+            figsize=(14 / 2.54, 18 / 2.54),
+            sharex=True,
+            sharey=True,
+        )
+
+        data_df_full_sims = data_df_full_sims_dict[shortcut_type]
+        # for loop over dbs states
+        dbs_state_id = 0
+        for dbs_state in data_df_full_sims["dbs_state"].unique():
+            # skip afferent and dbs-off
+            if dbs_state in ["afferent", "dbs-off"]:
+                continue
+            # create a figure with m (number of sessions) subplots
+            fig, axs = plt.subplots(
+                nrows=1,
+                ncols=len(data_df_full_sims_dict["plastic"]["session"].unique()),
+                figsize=(14 / 2.54, 7 / 2.54),
+                sharex=True,
+                sharey=True,
+            )
+            # for loop over sessions
+            for session_id, session in enumerate(data_df_full_sims["session"].unique()):
+                # filter the simulation data for the current dbs state and dbs-off
+                data_df_full_sims_filtered = data_df_full_sims[
+                    data_df_full_sims["dbs_state"].isin(["dbs-off", dbs_state])
+                ].copy()
+                # rename the dbs state of the sims to dbs-on
+                data_df_full_sims_filtered.loc[
+                    data_df_full_sims_filtered["dbs_state"] == dbs_state,
+                    "dbs_state",
+                ] = "dbs-on"
+                # combine the patient and simulation data and add the column "subject_type"
+                data_df_full_sims_filtered["subject_type"] = "simulations"
+                data_df_full_patients["subject_type"] = "patients"
+                data_df_full_combined = pd.concat(
+                    [data_df_full_sims_filtered, data_df_full_patients]
+                ).copy()
+                # filter data to only contain session
+                data_df_full_combined = data_df_full_combined[
+                    data_df_full_combined["session"] == session
+                ]
+                # order the subject_type (patient, simulation)
+                data_df_full_combined["subject_type"] = pd.Categorical(
+                    data_df_full_combined["subject_type"],
+                    categories=["patients", "simulations"],
+                    ordered=True,
+                )
+                # perform a 2 way repeated measures ANOVA with between factor
+                # "subject_type" and within factor "dbs_state"
+                aov = pg.mixed_anova(
+                    data=data_df_full_combined,
+                    dv="unrewarded_decisions",
+                    within="dbs_state",
+                    subject="subject",
+                    between="subject_type",
+                )
+                # save results
+                with open(
+                    f"statistic/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}_ses_{session}.txt",
+                    "w",
+                ) as fh:
+                    fh.write(aov.round(3).to_string())
+
+                # perform post hoc t-tests
+                result = pg.pairwise_tests(
+                    data=data_df_full_combined,
+                    dv="unrewarded_decisions",
+                    within="dbs_state",
+                    subject="subject",
+                    between="subject_type",
+                    padjust="bonf",
+                    return_desc=True,
+                )
+                # save results in the same file
+                with open(
+                    f"statistic/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}_ses_{session}.txt",
+                    "a",
+                ) as fh:
+                    fh.write("\n\npost hoc t-tests:\n")
+                    fh.write(result.round(3).to_string())
+
+                ################################## plot settings #########################################
+
+                label_size = 9
+                dbs_red = (0.8, 0, 0, 0.8)
+                dbs_blue = (0, 0, 0.65)
+
+                ################################ kleine Abbildungen ######################################
+
+                # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
+                sns.boxplot(
+                    data=data_df_full_combined,
+                    x="subject_type",
+                    y="unrewarded_decisions",
+                    hue="dbs_state",
+                    ax=axs[session_id],
+                    palette={"dbs-off": dbs_blue, "dbs-on": dbs_red},
+                    boxprops=dict(edgecolor="black", linewidth=1),
+                    whiskerprops=dict(color="black", linewidth=1),
+                    capprops=dict(color="black", linewidth=1),
+                    medianprops=dict(color="black", linewidth=1),
+                    flierprops={
+                        "marker": "o",
+                        "color": "black",
+                        "markersize": 4,
+                        "markeredgecolor": "black",
+                        "markerfacecolor": "none",
+                    },
+                    linewidth=1,
+                )
+
+                ################ axis settings #####################
+
+                axs[session_id].tick_params(axis="both", labelsize=label_size)
+                axs[session_id].set_ylabel(
+                    "unrewarded decisions", fontweight="bold", fontsize=label_size
+                )
+                axs[session_id].set_xlabel(
+                    "subject type", fontweight="bold", fontsize=label_size
+                )
+                # axs[session_id].set_xticklabels(["patients", "simulations"])
+
+                if session_id > 0:
+                    axs[session_id].set_ylabel("")
+
+                for column_idx, column_label in enumerate(
+                    ["Session 1", "Session 2", "Session 3"]
+                ):
+                    axs[column_idx].set_title(
+                        column_label, fontweight="bold", fontsize=label_size
+                    )
+
+                ############## legend #################
+
+                handles, labels = axs[0].get_legend_handles_labels()
+
+                label_mapping = {
+                    "dbs-off": "DBS OFF",
+                    "dbs-on": "DBS ON",
+                }
+                labels = [label_mapping.get(label, label) for label in labels]
+
+                axs[session_id].legend().remove()
+
+                # fig = plt.gcf()
+                legend = fig.legend(
+                    handles,
+                    labels,
+                    loc="lower center",
+                    ncol=2,
+                    fontsize=label_size,
+                    bbox_to_anchor=(0.5, -0.01),
+                )
+
+                # get the coordinates of the legend box
+                legend_bbox = legend.get_window_extent()
+                legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
+
+                ################################### große Abbildungen ######################################
+
+                sns.boxplot(
+                    data=data_df_full_combined,
+                    x="subject_type",
+                    y="unrewarded_decisions",
+                    hue="dbs_state",
+                    ax=axs_full[dbs_state_id, session_id],
+                    palette={"dbs-off": dbs_blue, "dbs-on": dbs_red},
+                    boxprops=dict(edgecolor="black", linewidth=1),
+                    whiskerprops=dict(color="black", linewidth=1),
+                    capprops=dict(color="black", linewidth=1),
+                    medianprops=dict(color="black", linewidth=1),
+                    flierprops={
+                        "marker": "o",
+                        "color": "black",
+                        "markersize": 4,
+                        "markeredgecolor": "black",
+                        "markerfacecolor": "none",
+                    },
+                    linewidth=1,
+                )
+
+                ################ axis settings #####################
+
+                axs_full[dbs_state_id, session_id].tick_params(
+                    axis="both", labelsize=label_size
+                )
+                axs_full[dbs_state_id, session_id].set_ylabel(
+                    "unrewarded decisions", fontweight="bold", fontsize=label_size
+                )
+                axs_full[dbs_state_id, session_id].set_xlabel(
+                    "subject type", fontweight="bold", fontsize=label_size
+                )
+                # axs_full[dbs_state_id, session_id].set_xticklabels(
+                #    ["patients", "simulations"]
+                # )
+
+                if session_id >= 1:
+                    axs_full[dbs_state_id, session_id].set_ylabel("")
+                else:
+                    axs_full[dbs_state_id, session_id].tick_params(
+                        axis="y", labelsize=label_size
+                    )
+
+                if dbs_state_id < 3:
+                    axs_full[dbs_state_id, session_id].set_xticklabels([])
+                    axs_full[dbs_state_id, session_id].set_xlabel("")
+
+                for column_idx, column_label in enumerate(
+                    ["Session 1", "Session 2", "Session 3"]
+                ):
+                    axs_full[0, column_idx].set_title(
+                        column_label, fontweight="bold", fontsize=label_size
+                    )
+
+                ############## legend #################
+
+                handles_full, labels_full = axs_full[1][1].get_legend_handles_labels()
+
+                label_mapping_full = {
+                    "dbs-off": "DBS OFF",
+                    "dbs-on": "DBS ON",
+                }
+                labels_full = [
+                    label_mapping_full.get(label, label) for label in labels_full
+                ]
+
+                axs_full[dbs_state_id, session_id].legend().remove()
+
+                # fig1 = plt.gcf()
+                legend_full = fig_full.legend(
+                    handles_full,
+                    labels_full,
+                    loc="lower center",
+                    ncol=2,
+                    fontsize=label_size,
+                    bbox_to_anchor=(0.5, -0.01),
+                )
+
+                # get the coordinates of the legend box
+                legend_bbox_full = legend_full.get_window_extent()
+                legend_bbox_full = legend_bbox_full.transformed(
+                    fig_full.transFigure.inverted()
+                )
+
+                ################# significance * #################
+
+                # function for significance over the boxplots
+                def add_star(ax, x1, x2, y):
+                    """Add asterisks for significant differences."""
+                    y_offset = 0.5
+                    ax.plot(
+                        [x1, x1, x2, x2],
+                        [y, y + y_offset, y + y_offset, y],
+                        color="black",
+                        linewidth=1,
+                    )
+                    ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
+
+                if shortcut_type_id == 0:
+                    if session_id == 1:
+                        if dbs_state_id == 0:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 24)
+                        if dbs_state_id == 1:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 28)
+                        if dbs_state_id == 2:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 28)
+                        if dbs_state_id == 3:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 24)
+
+                else:
+                    if session_id == 1:
+                        if dbs_state_id == 0:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 26)
+                        if dbs_state_id == 2:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 26)
+                        if dbs_state_id == 3:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 25)
+                    if session_id == 2:
+                        if dbs_state_id == 0:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 25)
+                            add_star(axs_full[dbs_state_id, session_id], -0.2, 0.8, 28)
+                        if dbs_state_id == 1:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 25)
+                            add_star(axs_full[dbs_state_id, session_id], -0.2, 0.8, 28)
+                        if dbs_state_id == 2:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 25)
+                            add_star(axs_full[dbs_state_id, session_id], -0.2, 0.8, 28)
+                        if dbs_state_id == 3:
+                            add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 25)
+                            add_star(axs_full[dbs_state_id, session_id], -0.2, 0.8, 28)
+
+                ################################ mittlere Abbildungen ######################################
+                # first three pics
+                if dbs_state == "dbs-comb" and shortcut_type == "plastic":
+                    sns.boxplot(
+                        data=data_df_full_combined,
+                        x="subject_type",
+                        y="unrewarded_decisions",
+                        hue="dbs_state",
+                        ax=axs_fixed_and_plastic[session_id],
+                        palette={"dbs-off": dbs_blue, "dbs-on": dbs_red},
+                        boxprops=dict(edgecolor="black", linewidth=1),
+                        whiskerprops=dict(color="black", linewidth=1),
+                        capprops=dict(color="black", linewidth=1),
+                        medianprops=dict(color="black", linewidth=1),
+                        flierprops={
+                            "marker": "o",
+                            "color": "black",
+                            "markersize": 4,
+                            "markeredgecolor": "black",
+                            "markerfacecolor": "none",
+                        },
+                        linewidth=1,
+                    )
+                    axs_fixed_and_plastic[session_id].get_legend().remove()
+
+                    ################ axis settings #####################
+
+                    # axs_fixed_and_plastic[session_id].set_xticklabels(
+                    #    ["patients", "simulations"]
+                    # )
+                    axs_fixed_and_plastic[session_id].tick_params(
+                        axis="both", labelsize=label_size
+                    )
+                    axs_fixed_and_plastic[session_id].set_ylabel(
+                        "unrewarded decisions",
+                        fontweight="bold",
+                        fontsize=label_size,
+                    )
+                    axs_fixed_and_plastic[session_id].set_xlabel(
+                        "subject type", fontweight="bold", fontsize=label_size
+                    )
+
+                    if session_id > 0:
+                        axs_fixed_and_plastic[session_id].set_ylabel("")
+
+                    ################# significance * #################
+
+                    # function for significance over the boxplots
+                    def add_star(ax, x1, x2, y):
+
+                        y_offset = 0.5
+                        ax.plot(
+                            [x1, x1, x2, x2],
+                            [y, y + y_offset, y + y_offset, y],
+                            color="black",
+                            linewidth=1.0,
+                        )
+                        ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
+
+                    if session_id == 1:
+                        add_star(axs_fixed_and_plastic[session_id], 0.20, 1.20, 24)
+
+                elif (
+                    dbs_state == "dbs-comb"
+                    and shortcut_type == "fixed"
+                    and session_id == 2
+                ):
+                    sns.boxplot(
+                        # only data for subject_type == "simulation"
+                        data=data_df_full_combined,
+                        x="subject_type",
+                        y="unrewarded_decisions",
+                        hue="dbs_state",
+                        ax=axs_fixed_and_plastic[-1],
+                        palette={"dbs-off": dbs_blue, "dbs-on": dbs_red},
+                        boxprops=dict(edgecolor="black", linewidth=1),
+                        whiskerprops=dict(color="black", linewidth=1),
+                        capprops=dict(color="black", linewidth=1),
+                        medianprops=dict(color="black", linewidth=1),
+                        flierprops={
+                            "marker": "o",
+                            "color": "black",
+                            "markersize": 4,
+                            "markeredgecolor": "black",
+                            "markerfacecolor": "none",
+                        },
+                        linewidth=1,
+                    )
+                    axs_fixed_and_plastic[-1].get_legend().remove()
+                    axs_fixed_and_plastic[-1].set_ylabel("")
+                    axs_fixed_and_plastic[-1].tick_params(
+                        axis="both", labelsize=label_size
+                    )
+                    axs_fixed_and_plastic[-1].set_xlabel(
+                        "subject type", fontweight="bold", fontsize=label_size
+                    )
+                    # axs_fixed_and_plastic[-1].set_xticklabels(
+                    #     ["patients", "simulations"]
+                    # )
+
+                    ################# significance * #################
+
+                    # function for significance over the boxplots
+                    def add_star(ax, x1, x2, y):
+
+                        y_offset = 0.5
+                        ax.plot(
+                            [x1, x1, x2, x2],
+                            [y, y + y_offset, y + y_offset, y],
+                            color="black",
+                            linewidth=1.0,
+                        )
+                        ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
+
+                    add_star(axs_fixed_and_plastic[-1], 0.20, 1.20, 24)
+                    add_star(axs_fixed_and_plastic[-1], -0.20, 0.80, 27)
+
+                ###################### titels #######################
+
+                for column_idx, column_label in enumerate(
+                    [
+                        "Session 1",
+                        "Session 2",
+                        "Session 3",
+                        "Session 3\n(fixed shortcut)",
+                    ]
+                ):
+                    axs_fixed_and_plastic[column_idx].set_title(
+                        column_label, fontweight="bold", fontsize=label_size
+                    )
+
+                ############## legend #################
+
+                handles_fixed_and_plastic, labels_fixed_and_plastic = (
+                    axs_fixed_and_plastic[0].get_legend_handles_labels()
+                )
+
+                label_mapping_fixed_and_plastic = {
+                    "dbs-off": "DBS OFF",
+                    "dbs-on": "DBS ON",
+                }
+                labels_fixed_and_plastic = [
+                    label_mapping_fixed_and_plastic.get(label, label)
+                    for label in labels_fixed_and_plastic
+                ]
+
+                # fig = plt.gcf()
+                legend_fixed_and_plastic = fig_fixed_and_plastic.legend(
+                    handles_fixed_and_plastic,
+                    labels_fixed_and_plastic,
+                    loc="lower center",
+                    ncol=2,
+                    fontsize=label_size,
+                    bbox_to_anchor=(0.5, -0.01),
+                )
+
+                # get the coordinates of the legend box
+                legend_bbox_fixed_and_plastic = (
+                    legend_fixed_and_plastic.get_window_extent()
+                )
+                legend_bbox_fixed_and_plastic = (
+                    legend_bbox_fixed_and_plastic.transformed(
+                        fig_fixed_and_plastic.transFigure.inverted()
+                    )
+                )
+
+            ############################### save figs, layout & labels #########################################
+
+            #################### kleine Abbildung ######################
+            fig.tight_layout(
+                pad=0,
+                h_pad=1.08,
+                w_pad=1.08,
+                rect=[0, legend_bbox.y1 + 0.01, 1 + 0.002, 1],
+            )
+            fig.savefig(
+                f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}.png",
+                dpi=300,
+            )
+            fig.savefig(
+                f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}_{dbs_state}.pdf",
+                format="pdf",
+                dpi=300,
+            )
+            plt.close(fig)
+            dbs_state_id += 1
+
+        #################### große Abbildung #######################
+
+        if shortcut_type_id == 0:
+            fig_full.tight_layout(
+                pad=0,
+                h_pad=1.08,
+                w_pad=1.08,
+                rect=[0.03, legend_bbox_full.y1 + 0.01, 1, 1],
+            )
+        else:
+            fig_full.tight_layout(
+                pad=0,
+                h_pad=1.08,
+                w_pad=1.08,
+                rect=[0.03, legend_bbox_full.y1 + 0.01, 1, 1],
+            )
+
+        # plot labels
+        plt.text(0.001, 0.965, "A", transform=plt.gcf().transFigure, fontsize=11)
+        plt.text(0.001, 0.74, "B", transform=plt.gcf().transFigure, fontsize=11)
+        plt.text(0.001, 0.512, "C", transform=plt.gcf().transFigure, fontsize=11)
+        plt.text(0.001, 0.29, "D", transform=plt.gcf().transFigure, fontsize=11)
+
+        fig_full.savefig(
+            f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}.png", dpi=300
+        )
+        fig_full.savefig(
+            f"fig/patients_vs_sims_{number_of_persons}_{shortcut_type}.pdf",
+            format="pdf",
+            dpi=300,
+        )
+        plt.close(fig_full)
+
+    ################## mittlere Abbildung #######################
+
+    fig_fixed_and_plastic.tight_layout(
+        pad=0,
+        h_pad=1.08,
+        w_pad=1.08,
+        rect=[0, legend_bbox_fixed_and_plastic.y1 + 0.01, 1 - 0.006, 1],
+    )
+    fig_fixed_and_plastic.savefig(
+        f"fig/patients_vs_sims_plastic_and_fixed_{number_of_persons}.png", dpi=300
+    )
+    fig_fixed_and_plastic.savefig(
+        f"fig/patients_vs_sims_plastic_and_fixed_{number_of_persons}.pdf",
+        format="pdf",
+        dpi=300,
+    )
+    plt.close(fig_fixed_and_plastic)
+
+
 #################################################################################################################
 ########################################### function call #######################################################
 #################################################################################################################
@@ -4014,9 +4818,11 @@ if __name__ == "__main__":
     if __fig_shortcut_on_off__:
         shortcut_on_off(True, 14)
 
+    """
     if __fig_dbs_on_off_14_and_100__:
         dbs_on_off_14_and_100(shortcut=True)
         dbs_on_off_14_and_100(shortcut=False)
+    """
 
     if __fig_activity_changes_dbs_on__:
         activity_changes_dbs_on()
@@ -4048,3 +4854,9 @@ if __name__ == "__main__":
         support_over_time(shortcut=False)
         # plot support for "action 0" for plastic shortcut
         support_over_time(shortcut=True, for_selected=False)
+
+    if __fig_simulation_data_difference_dbs_on_off_100__:
+        fig_simulation_data_difference_dbs_on_off_100(100)
+
+    if __fig_patients_vs_sims__:
+        fig_patients_vs_sims(100)
