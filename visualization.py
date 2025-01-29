@@ -19,7 +19,7 @@ __fig_shortcut_on_off__ = False
 __fig_activity_changes_dbs_on__ = False
 __fig_activity_changes_dbs_off__ = False
 __fig_gpi_scatter__ = False
-__fig_load_simulate__ = False
+__fig_load_simulate__ = True
 __fig_load_simulate_dbscomb__ = False
 __fig_dbs_parameter__ = False
 __fig_parameter_gpi_inhib__ = False
@@ -387,72 +387,6 @@ def dbs_on_off_14_and_100(switch=True, shortcut=True):
     data2 = np.array(data2)
     data3 = np.array(data3)
 
-    """
-    ############################################## means ###############################################
-    # mean simulation data
-    mean_14_1 = stat.mean_data(result_14_1)
-    mean_14_2 = stat.mean_data(result_14_2)
-    # mean_14_3 = stat.mean_data(result_14_3)
-    mean_14_4 = stat.mean_data(result_14_4)
-    mean_14_5 = stat.mean_data(result_14_5)
-    mean_14_6 = stat.mean_data(result_14_6)
-
-    mean_100_1 = stat.mean_data(result_100_1)
-    mean_100_2 = stat.mean_data(result_100_2)
-    # mean_100_3 = stat.mean_data(result_100_3)
-    mean_100_4 = stat.mean_data(result_100_4)
-    mean_100_5 = stat.mean_data(result_100_5)
-    mean_100_6 = stat.mean_data(result_100_6)
-
-    # mean patient data
-    mean_sessions = stat.mean_dbs_session(filepath1, filepath2, switch)
-    meanON = mean_sessions[0]
-    meanOFF = mean_sessions[1]
-
-    # mean bars
-    means_14 = [mean_14_1, mean_14_2, mean_14_4, mean_14_5, mean_14_6]
-    means_100 = [mean_100_1, mean_100_2, mean_100_4, mean_100_5, mean_100_6]
-    means = [meanON, meanOFF]
-
-    ######################################### standard errors ##########################################
-    # standard error simualtion data
-    standarderror_14_1 = stat.standarderror_data(result_14_1)
-    standarderror_14_2 = stat.standarderror_data(result_14_2)
-    # standarderror_14_3 = stat.standarderror_data(result_14_3)
-    standarderror_14_4 = stat.standarderror_data(result_14_4)
-    standarderror_14_5 = stat.standarderror_data(result_14_5)
-    standarderror_14_6 = stat.standarderror_data(result_14_6)
-
-    standarderror_100_1 = stat.standarderror_data(result_100_1)
-    standarderror_100_2 = stat.standarderror_data(result_100_2)
-    # standarderror_100_3 = stat.standarderror_data(result_100_3)
-    standarderror_100_4 = stat.standarderror_data(result_100_4)
-    standarderror_100_5 = stat.standarderror_data(result_100_5)
-    standarderror_100_6 = stat.standarderror_data(result_100_6)
-
-    # standard error patient data
-    standarderror = stat.session_standard_error(filepath1, filepath2, switch)
-    standarderrorON = standarderror[0]
-    standarderrorOFF = standarderror[1]
-
-    # standarderrors bars
-    standarderror_14 = [
-        standarderror_14_1,
-        standarderror_14_2,
-        standarderror_14_4,
-        standarderror_14_5,
-        standarderror_14_6,
-    ]
-    standarderror_100 = [
-        standarderror_100_1,
-        standarderror_100_2,
-        standarderror_100_4,
-        standarderror_100_5,
-        standarderror_100_6,
-    ]
-    standarderror = [standarderrorON, standarderrorOFF]
-    """
-
     ############################################### histo settings ##############################################
 
     # sessions
@@ -807,8 +741,8 @@ def activity_changes_dbs_on():
             " ": table_legend,
             "mean_dbs-off": table_mean_dbs1,
             "error_dbs-off": table_error_dbs1,
-            "mean_supression": table_mean_dbs2,
-            "error_supression": table_error_dbs2,
+            "mean_suppression": table_mean_dbs2,
+            "error_suppression": table_error_dbs2,
             "mean_efferent": table_mean_dbs3,
             "error_efferent": table_error_dbs3,
             "mean_afferent": table_mean_dbs4,
@@ -860,10 +794,7 @@ def activity_changes_dbs_on():
         error_dbs6 = []
 
         for i in range(len(data_dbs1)):
-            error_dbs1.append(
-                # np.std(data_dbs1[i], ddof=1) / np.sqrt(np.size(data_dbs1[i]))
-                np.std(data_dbs1[i])
-            )
+            error_dbs1.append(np.std(data_dbs1[i]))
             error_dbs2.append(np.std(data_dbs2[i]))
             error_dbs3.append(np.std(data_dbs3[i]))
             error_dbs4.append(np.std(data_dbs4[i]))
@@ -1002,9 +933,6 @@ def activity_changes_dbs_on():
                 color=colors,
             )
 
-            # plot legend
-            # axs[0].legend(labels, fontsize="large", loc="upper left")
-
             for i in range(len(error_dbs3)):
                 # plot error bars
                 axs[1].errorbar(
@@ -1069,9 +997,6 @@ def activity_changes_dbs_on():
                 color=colors,
             )
 
-            # plot legend
-            # axs[0].legend(labels, fontsize="large", loc="upper left")
-
             for i in range(len(error_dbs4)):
                 # plot error bars
                 axs[2].errorbar(
@@ -1134,7 +1059,7 @@ def activity_changes_dbs_on():
                 rotation=rot,
             )
 
-        ####################### passing fibres data ################################
+        ####################### passing fibers data ################################
         for i in range(len(mean_dbs5)):
             # plot means
             axs[3].barh(
@@ -1173,7 +1098,7 @@ def activity_changes_dbs_on():
         axs[3].tick_params(axis="both", labelsize=label_size)
 
         # title
-        axs[3].set_title("passing fibres", fontweight="bold", fontsize=label_size)
+        axs[3].set_title("passing fibers", fontweight="bold", fontsize=label_size)
 
         ############# significance* ####################
         for i in range(len(mean_dbs5)):
@@ -1267,9 +1192,6 @@ def activity_changes_dbs_on():
                 va="center",  # Zentrierung vertikal
                 rotation=rot,
             )
-
-        # Adjust layout to minimize margins
-        # plt.subplots_adjust(left=0.07, right=0.96, top=0.9, bottom=0.15, wspace=0.2)
 
         # Adjust layout
         plt.tight_layout(
@@ -1385,9 +1307,6 @@ def activity_changes_dbs_off():
                 color=colors,
             )
 
-            # plot legend
-            # axs[0].legend(labels, fontsize="large", loc="upper left")
-
             for i in range(len(error_dbs1)):
                 # plot error bars
                 axs.errorbar(
@@ -1402,8 +1321,6 @@ def activity_changes_dbs_off():
                 )
 
         ############# axis settings ###################
-        # horizontal line
-        # axs.axvline(x=0, color="black", linestyle="-", linewidth=0.75)
 
         # y-axis
         axs.set_yticks(positions)
@@ -1724,12 +1641,12 @@ def load_simulate():
             color="black",
             linewidth=1,
         )
-        ax.text((x1 + x2) / 2, y - 2.9, "*", fontsize=10, ha="center")
+        ax.text((x1 + x2) / 2, y - 2.5, "*", fontsize=10, ha="center")
 
-    add_star_up(ax, 0.8, 2.8, 35)
-    add_star_up(ax, 1.2, 3.2, 37)
-    add_star_up(ax, -0.2, 1.80, 31)
-    add_star_up(ax, 0.2, 2.20, 33)
+    add_star_up(ax, 0.8, 2.8, 36)
+    add_star_up(ax, 1.2, 3.2, 38)
+    add_star_up(ax, -0.2, 1.80, 32)
+    add_star_up(ax, 0.2, 2.20, 34)
     add_star_down(ax, 1.8, 2.8, 2.7)
 
     ################################## customize plot ###########################################
@@ -1751,214 +1668,6 @@ def load_simulate():
     plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
     plt.savefig("fig/__fig_load_simulate__.pdf", format="pdf", dpi=300)
     plt.close("all")
-
-
-"""
-def load_simulate_original():
-
-    # number of simulations
-    number_of_simulations = 100
-    passingoff = True
-
-    ################################ load dbs-on data ###########################################
-    resultON = []
-
-    for i in range(1, 3):
-        # without afferent and passing-fibres and dbs-comb
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_2.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultON.append(result)
-
-    ################################ load "simulation" data #####################################
-    resultSim = []
-
-    for i in range(1, 3):
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_3.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultSim.append(result)
-
-    ################################ load "loading" data ########################################
-    resultLoad = []
-
-    for i in range(1, 3):
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_4.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultLoad.append(result)
-
-    ################################ load dbs-off data ##########################################
-    resultOFF = []
-
-    for i in range(1, 3):
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_5.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultOFF.append(result)
-
-    ###################################### edit data ############################################
-
-    index = 2
-
-    result = []
-    for i in range(index):
-        result.append([resultOFF[i], resultSim[i], resultLoad[i], resultON[i]])
-
-    ################################## boxplot settings #########################################
-
-    if passingoff:
-        # Einstellung
-        colors = [
-            (1, 0.9, 0.9, 0.7),  # very bright red
-            (1, 0.6, 0.6, 0.7),  # bright red
-            # (0.8, 0, 0, 0.7),  # darkred
-        ]
-    else:
-        colors = [
-            (1, 0.9, 0.9, 0.7),  # very bright red
-            (1, 0.6, 0.6, 0.7),  # bright red
-            (1, 0.4, 0.4, 0.7),  # red
-            (0.8, 0, 0, 0.7),  # darkred
-        ]
-
-    # bar width
-    width = 0.1
-
-    # legend
-    if passingoff:
-        legend = ["suppression", "efferent"]  # , "dbs-comb"]
-    else:
-        legend = ["suppression", "efferent", "passing-fibres", "combined"]
-
-    # plot size
-    fig, ax = plt.subplots(figsize=(5, 3))
-
-    # sessions
-    # session = ["off\noff", "on\noff", "off\non", "on\non"]
-    on = r"$\bf{on}$"
-    session = [f"off\n{on}", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
-
-    # bar positions
-    x = np.arange(len(session))
-
-    if passingoff:
-        distance = 0.7
-    else:
-        distance = 2.25
-
-    for i in range(index):
-        positions = x - distance * width
-
-        # Plot boxplots
-        ax.boxplot(
-            result[i],
-            positions=positions,
-            widths=width,
-            boxprops=dict(facecolor=colors[i]),
-            medianprops=dict(color="black"),
-            patch_artist=True,
-            flierprops=dict(marker="o", color="black", markersize=2),
-        )
-
-        distance -= 1.4
-
-    # settings x-axis
-    plt.xticks(x, session, fontsize=label_size)
-    plt.text(
-        -0.8,
-        -4.0,
-        "acute\n  history",
-        fontsize=label_size,
-        ha="center",
-        va="center",
-    )
-
-    plt.tick_params(axis="both", labelsize=label_size)
-
-    ################################################### significance * #############################################
-
-    # function for significance over the boxplots
-    def add_star_up(ax, x1, x2, y):
-        y_offset = 0.5
-        ax.plot(
-            [x1, x1, x2, x2],
-            [y, y + y_offset, y + y_offset, y],
-            color="black",
-            linewidth=1,
-        )
-        ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
-
-    # function for significance among the boxplots
-    def add_star_down(ax, x1, x2, y):
-        y_offset = -0.5
-        ax.plot(
-            [x1, x1, x2, x2],
-            [y, y + y_offset, y + y_offset, y],
-            color="black",
-            linewidth=1,
-        )
-        ax.text((x1 + x2) / 2, y - 2.9, "*", fontsize=10, ha="center")
-
-    add_star_up(ax, 0.93, 2.93, 38)
-    add_star_up(ax, 1.07, 3.07, 40)
-    add_star_up(ax, -0.07, 1.93, 33)
-    add_star_up(ax, 0.07, 2.07, 35)
-    add_star_down(ax, 1.93, 2.93, 3)
-
-    # legend
-    legend_bars = [
-        plt.bar(0, 0, color=colors[i], label=legend[i]) for i in range(len(colors))
-    ]
-
-    #################################################### plot settings #############################################
-
-    plt.legend(handles=legend_bars, loc="upper left", fontsize=label_size)  # small
-
-    # setting y-axis
-    plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
-    plt.ylim(0, 46)
-
-    # Adjust layout
-    plt.tight_layout(
-        pad=0,
-        h_pad=1.08,
-        w_pad=1.08,
-        rect=[-0.006, -0.004, 1, 1],
-    )
-
-    plt.savefig("fig/__fig_load_simulate__.png", dpi=300)
-    plt.savefig("fig/__fig_load_simulate__.pdf", format="pdf", dpi=300)
-    plt.close("all")
-    """
 
 
 #################################################################################################################
@@ -2047,11 +1756,6 @@ def load_simulate_dbscomb():
 
     ###################################### edit data ############################################
 
-    # if passingoff:
-    #    index = 3
-    # else:
-    #    index = 4
-
     index = 2
 
     result = []
@@ -2126,13 +1830,46 @@ def load_simulate_dbscomb():
         spine.set_linewidth(1)
 
     plt.text(
-        -0.8,
+        -1.05,
         -4.5,
         "acute\n  history",
         fontsize=label_size,
         ha="center",
         va="center",
     )
+
+    ################################################### significance * #############################################
+
+    # function for significance over the boxplots
+    def add_star_up(ax, x1, x2, y):
+        """Add asterisks for significant differences."""
+        y_offset = 0.5
+        ax.plot(
+            [x1, x1, x2, x2],
+            [y, y + y_offset, y + y_offset, y],
+            color="black",
+            linewidth=1,
+        )
+        ax.text((x1 + x2) / 2, y + 0.1, "*", fontsize=10, ha="center")
+
+    # function for significance among the boxplots
+    def add_star_down(ax, x1, x2, y):
+        """Add asterisks for significant differences."""
+        y_offset = -0.5
+        ax.plot(
+            [x1, x1, x2, x2],
+            [y, y + y_offset, y + y_offset, y],
+            color="black",
+            linewidth=1,
+        )
+        ax.text((x1 + x2) / 2, y - 2.5, "*", fontsize=10, ha="center")
+
+    add_star_up(ax, 0.8, 2.8, 36)
+    add_star_up(ax, 1.2, 3.2, 38)
+    add_star_up(ax, -0.2, 1.80, 32)
+    add_star_up(ax, 0.2, 2.20, 34)
+    add_star_down(ax, 1.8, 2.8, 3.6)
+    add_star_down(ax, 2.2, 3.2, 2.0)
 
     ################################## customize plot ###########################################
 
@@ -2147,200 +1884,12 @@ def load_simulate_dbscomb():
         pad=0,
         h_pad=1.08,
         w_pad=1.08,
-        rect=[-0.002, -0.008, 1, 1],
+        rect=[-0.007, -0.008, 1, 1],
     )
 
     plt.savefig("fig/__fig_load_simulate_combined__.png", dpi=300)
     plt.savefig("fig/__fig_load_simulate_combined__.pdf", format="pdf", dpi=300)
     plt.close("all")
-
-
-"""
-def load_simulate_dbscomb_original():
-
-    # number of simulations
-    number_of_simulations = 100
-    passingoff = True
-
-    ################################ load dbs-on data ###########################################
-    resultON = []
-
-    for i in range(1, 6):
-        # without afferent and passing-fibres and dbs-comb
-        if i == 2:
-            continue
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_2.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultON.append(result)
-
-    ################################ load "simulation" data #####################################
-    resultSim = []
-
-    for i in range(1, 6):
-        if i == 2:
-            continue
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_3.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultSim.append(result)
-
-    ################################ load "loading" data ########################################
-    resultLoad = []
-
-    for i in range(1, 6):
-        if i == 2:
-            continue
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_4.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultLoad.append(result)
-
-    ################################ load dbs-off data ##########################################
-    resultOFF = []
-
-    for i in range(1, 6):
-        if i == 2:
-            continue
-        if i == 3:
-            continue
-        if i == 4 and passingoff:
-            continue
-
-        filepath = f"data/load_simulation_data/load_data/Results_DBS_State_{i}_Condition_5.json"
-        result = stat.read_json_data(filepath)
-        result = stat.processing_habit_session3(result, number_of_simulations)
-        result = result.T
-        result = result[0].tolist()
-        resultOFF.append(result)
-
-    ###################################### edit data ############################################
-
-    # if passingoff:
-    #    index = 3
-    # else:
-    #    index = 4
-
-    index = 2
-
-    result = []
-    for i in range(index):
-        result.append([resultOFF[i], resultSim[i], resultLoad[i], resultON[i]])
-
-    ################################## boxplot settings #########################################
-
-    if passingoff:
-        # Einstellung
-        colors = [
-            (1, 0.9, 0.9, 0.7),  # very bright red
-            # (1, 0.6, 0.6, 0.7),  # bright red
-            (0.8, 0, 0, 0.7),  # darkred
-        ]
-    else:
-        colors = [
-            (1, 0.9, 0.9, 0.7),  # very bright red
-            (1, 0.6, 0.6, 0.7),  # bright red
-            (1, 0.4, 0.4, 0.7),  # red
-            (0.8, 0, 0, 0.7),  # darkred
-        ]
-
-    # bar width
-    width = 0.1
-
-    # legend
-    if passingoff:
-        legend = ["suppression", "combined"]
-    else:
-        legend = ["suppression", "efferent", "passing-fibres", "combined"]
-
-    # plot size
-    fig, ax = plt.subplots(figsize=(5, 3))
-
-    # sessions
-    on = r"$\bf{on}$"
-    session = [f"off\n{on}", f"{on}\noff", f"off\n{on}", f"{on}\n{on}"]
-
-    # bar positions
-    x = np.arange(len(session))
-
-    if passingoff:
-        distance = 0.7
-    else:
-        distance = 2.25
-
-    for i in range(index):
-        positions = x - distance * width
-
-        # Plot boxplots
-        ax.boxplot(
-            result[i],
-            positions=positions,
-            widths=width,
-            boxprops=dict(facecolor=colors[i]),
-            medianprops=dict(color="black"),
-            patch_artist=True,
-            flierprops=dict(marker="o", color="black", markersize=2),
-        )
-
-        distance -= 1.4
-
-    # settings x-axis
-    plt.xticks(x, session, fontsize=label_size)
-    plt.text(
-        -0.8,
-        -4.0,
-        "acute\n  history",
-        fontsize=label_size,
-        ha="center",
-        va="center",
-    )
-
-    # legend
-    legend_bars = [
-        plt.bar(0, 0, color=colors[i], label=legend[i]) for i in range(len(colors))
-    ]
-
-    plt.legend(handles=legend_bars, loc="upper left", fontsize=label_size)  # small
-
-    # setting y-axis
-    plt.ylabel("unrewarded decisions", fontweight="bold", fontsize=label_size)
-    plt.ylim(0, 46)
-
-    plt.tick_params(axis="both", labelsize=label_size)
-
-    # Adjust layout
-    plt.tight_layout(
-        pad=0,
-        h_pad=1.08,
-        w_pad=1.08,
-        rect=[-0.006, -0.004, 1, 1],
-    )
-
-    plt.savefig("fig/__fig_load_simulate_dbscomb__.png", dpi=300)
-    plt.savefig("fig/__fig_load_simulate_dbscomb__.pdf", format="pdf", dpi=300)
-    plt.close("all")
-"""
 
 
 #################################################################################################################
@@ -2360,7 +1909,7 @@ def dbs_parameter():
         "suppression",
         "efferent",
         "afferent",
-        "passing fibres",
+        "passing fibers",
     ]
 
     parameter_name = [
@@ -2482,7 +2031,7 @@ def dbs_parameter():
         if i == "afferent":
             data = data_afferent
             param = param_afferent
-        if i == "passing fibres":
+        if i == "passing fibers":
             data = data_passing_fibres
             param = param_passing_fibres
 
@@ -2598,7 +2147,7 @@ def parameter_gpi_inhib():
         "suppression",
         "efferent",
         "afferent",
-        "passing fibres",
+        "passing fibers",
     ]
 
     parameter_name = [
@@ -2734,7 +2283,7 @@ def parameter_gpi_inhib():
         if i == "afferent":
             data = [mean_afferent, data_GPi_afferent]
             param = param_afferent
-        if i == "passing fibres":
+        if i == "passing fibers":
             data = [mean_passing_fibres, data_GPi_passing_fibres]
             param = param_passing_fibres
 
@@ -2785,7 +2334,7 @@ def parameter_gpi_inhib():
         ax2.tick_params(axis="both", which="major", labelsize=label_size)
         ax2.set_xlabel(parameter_name[idx - 1])
         ax2.set_title(i, fontweight="bold", fontsize=label_size)
-        if i == "efferent" or i == "passing fibres":
+        if i == "efferent" or i == "passing fibers":
             ax2.set_ylabel("average rate", fontweight="bold", fontsize=label_size)
         else:
             ax2.set_yticklabels([])
@@ -2967,7 +2516,7 @@ def weights_over_time_boxplots(
                 "efferent": (1, 0.5, 0.5, 0.8),
                 "combined": (0.8, 0, 0, 0.8),
                 "OFF": "darkblue",
-                "passing fibres": "yellow",
+                "passing fibers": "yellow",
                 "afferent": "green",
             },
             data=df_filtered_plot,
@@ -3031,7 +2580,7 @@ def get_weights_over_time_data_frame(
     n_sims, w_direct, w_indirect, w_hyperdirect, w_shortcut, w_dopa_predict
 ):
     # create a pandas dataframe with columns "w", "sim_id", "dbs_type" (suppression,
-    # efferent, afferent, passing fibres, combined), "dbs_state" (ON, OFF), "session" (1,2,3),
+    # efferent, afferent, passing fibers, combined), "dbs_state" (ON, OFF), "session" (1,2,3),
     # "pathway" (direct, indirect, hyperdirect, shortcut, dopa_predict), "channel" (0, 1)
     # and "trial" (0-119)
     df = {
@@ -3060,7 +2609,7 @@ def get_weights_over_time_data_frame(
                 "efferent",
                 "combined",
                 "afferent",
-                "passing fibres",
+                "passing fibers",
             ]:
                 for session in [1, 2, 3]:
                     if dbs_state == "OFF":
@@ -3070,7 +2619,7 @@ def get_weights_over_time_data_frame(
                             "suppression": 1,
                             "efferent": 2,
                             "afferent": 3,
-                            "passing fibres": 4,
+                            "passing fibers": 4,
                             "combined": 5,
                         }[dbs_type]
                     # each session has 40 trials
@@ -3112,7 +2661,7 @@ def get_weights_over_time_data_frame(
 
 def get_weights_over_time_arrays(n_sims, n_dbs, n_trials):
     # we have weights for each sim (0-99), shortcut (0-fixed,1-plastic), dbs state
-    # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing fibres,5-combined)
+    # (0-DBS-OFF,1-suppression,2-efferent,3-afferent,4-passing fibers,5-combined)
 
     name_list = []
     for sim_id in range(n_sims):
@@ -3222,7 +2771,7 @@ def weights_over_time_lineplots_old(
         ["suppression", True],
         ["efferent", True],
         ["afferent", False],
-        ["passing fibres GPe-STN", False],
+        ["passing fibers GPe-STN", False],
         ["combined", True],
     ]
 
@@ -3474,8 +3023,8 @@ def weights_over_time():
     weights_over_time_lineplots(
         df[df["dbs_type"].isin(["suppression", "efferent", "combined"])]
     )
-    # ["passing fibres", "afferent"]
-    weights_over_time_lineplots(df[df["dbs_type"].isin(["passing fibres", "afferent"])])
+    # ["passing fibers", "afferent"]
+    weights_over_time_lineplots(df[df["dbs_type"].isin(["passing fibers", "afferent"])])
 
     """
     # Create boxplots for all dbs types and sessions
@@ -3486,7 +3035,7 @@ def weights_over_time():
             "efferent",
             "combined",
             "afferent",
-            "passing fibres",
+            "passing fibers",
             "OFF",
         ],
         specific_sessions=[1, 2, 3],
@@ -3531,7 +3080,7 @@ def support_over_time(shortcut=True, for_selected=True):
         "suppression",
         "efferent",
         "afferent",
-        "passing fibres GPe-STN",
+        "passing fibers GPe-STN",
         "combined",
     ]
 
@@ -3556,7 +3105,7 @@ def support_over_time(shortcut=True, for_selected=True):
     support_indices = np.arange(120)
     for dbs_state in range(6):
 
-        # skip dbs states affernet and passing fibres GPe-STN
+        # skip dbs states affernet and passing fibers GPe-STN
         if dbs_state in [3, 4]:
             continue
 
@@ -3774,7 +3323,7 @@ def support_over_time(shortcut=True, for_selected=True):
 
             y_offset = 0.01
 
-            # dbs-off -> supression, efferent, combined
+            # dbs-off -> suppression, efferent, combined
             if efferent:
                 for i in range(3):
                     if i == 0:
@@ -3873,12 +3422,11 @@ def support_over_time(shortcut=True, for_selected=True):
             kind="line",
             data=support_df_dbs,
             palette={"shortcut": (0.8, 0, 0, 0.7), "basal ganglia": lighter_darkblue},
-            height=2.5,  # Höhe des Plots
-            aspect=1,  # Verhältnis der Breite zur Höhe
+            height=2.5,
+            aspect=1,
         )
 
-        # Entferne die Titel
-        ax.set_titles("")  # Leerer Titel für alle Subplots
+        ax.set_titles("")
 
         # plot labels
         label = ["A", "B", "C", "D"]
@@ -3892,27 +3440,19 @@ def support_over_time(shortcut=True, for_selected=True):
             )
 
         for ax_sub in ax.axes.flat:
-            ax_sub.set_xlabel(
-                "Trial", fontweight="bold", fontsize=label_size
-            )  # Achsenbeschriftung x
-            ax_sub.set_ylabel(
-                "support", fontweight="bold", fontsize=label_size
-            )  # Achsenbeschriftung y
+            ax_sub.set_xlabel("Trial", fontweight="bold", fontsize=label_size)
+            ax_sub.set_ylabel("support", fontweight="bold", fontsize=label_size)
 
-            # Stelle sicher, dass die Tick-Schriftgröße auf allen Achsen gesetzt wird
-            ax_sub.tick_params(axis="x", labelsize=label_size)  # x-Achsen Ticks
-            ax_sub.tick_params(axis="y", labelsize=label_size)  # y-Achsen Ticks
+            ax_sub.tick_params(axis="x", labelsize=label_size)
+            ax_sub.tick_params(axis="y", labelsize=label_size)
 
-        # Extrahiere die Handles und Labels der Legende
+        # handles und Labels from legend
         handles, labels = ax.legend.legend_handles, [
             text.get_text() for text in ax.legend.texts
         ]
 
-        # Entferne die lokale Legende
         ax.legend.remove()
 
-        # Füge die globale Legende hinzu
-        # fig = ax.fig
         fig = plt.gcf()
         legend = fig.legend(
             handles,
@@ -4044,14 +3584,14 @@ def fig_simulation_data_difference_dbs_on_off_100(number_of_persons):
     data_df_full_sims_compare_dbs = data_df_full_sims_compare_dbs[
         data_df_full_sims_compare_dbs["dbs_state"] != "afferent"
     ]
-    # order the dbs states (dbs-off, suppression, efferent, passing fibres, dbs-comb)
+    # order the dbs states (dbs-off, suppression, efferent, passing fibers, dbs-comb)
     data_df_full_sims_compare_dbs["dbs_state"] = pd.Categorical(
         data_df_full_sims_compare_dbs["dbs_state"],
         categories=[
             "dbs-off",
             "suppression",
             "efferent",
-            "passing fibres",
+            "passing fibers",
             "dbs-comb",
         ],
         ordered=True,
@@ -4083,7 +3623,7 @@ def fig_simulation_data_difference_dbs_on_off_100(number_of_persons):
                 "dbs-off",
                 "suppression",
                 "efferent",
-                "passing fibres",
+                "passing fibers",
                 "dbs-comb",
             ],
             ax=axs_compare_dbs[shortcut_type_id],
@@ -4092,7 +3632,7 @@ def fig_simulation_data_difference_dbs_on_off_100(number_of_persons):
                 "efferent": (1, 0.5, 0.5, 0.8),
                 "dbs-comb": (0.8, 0, 0, 0.8),
                 "dbs-off": (0, 0, 0.65),
-                "passing fibres": (1, 0.3, 0.3, 0.8),
+                "passing fibers": (1, 0.3, 0.3, 0.8),
             },
             boxprops=dict(edgecolor="black", linewidth=1),
             whiskerprops=dict(color="black", linewidth=1),
@@ -4230,14 +3770,14 @@ def fig_patients_vs_sims(number_of_persons):
     data_df_full_sims_compare_dbs = data_df_full_sims_compare_dbs[
         data_df_full_sims_compare_dbs["dbs_state"] != "afferent"
     ]
-    # order the dbs states (dbs-off, suppression, efferent, passing fibres, dbs-comb)
+    # order the dbs states (dbs-off, suppression, efferent, passing fibers, dbs-comb)
     data_df_full_sims_compare_dbs["dbs_state"] = pd.Categorical(
         data_df_full_sims_compare_dbs["dbs_state"],
         categories=[
             "dbs-off",
             "suppression",
             "efferent",
-            "passing fibres",
+            "passing fibers",
             "dbs-comb",
         ],
         ordered=True,
@@ -4363,7 +3903,7 @@ def fig_patients_vs_sims(number_of_persons):
                 dbs_red = (0.8, 0, 0, 0.8)
                 dbs_blue = (0, 0, 0.65)
 
-                ################################ kleine Abbildungen ######################################
+                ################################ 3x1 figure ######################################
 
                 # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
                 sns.boxplot(
@@ -4434,7 +3974,7 @@ def fig_patients_vs_sims(number_of_persons):
                 legend_bbox = legend.get_window_extent()
                 legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
 
-                ################################### große Abbildungen ######################################
+                ################################### 3x4 figure ######################################
 
                 sns.boxplot(
                     data=data_df_full_combined,
@@ -4468,9 +4008,6 @@ def fig_patients_vs_sims(number_of_persons):
                 axs_full[dbs_state_id, session_id].set_xlabel(
                     "subject type", fontweight="bold", fontsize=label_size
                 )
-                # axs_full[dbs_state_id, session_id].set_xticklabels(
-                #    ["patients", "simulations"]
-                # )
 
                 if session_id >= 1:
                     axs_full[dbs_state_id, session_id].set_ylabel("")
@@ -4567,7 +4104,7 @@ def fig_patients_vs_sims(number_of_persons):
                             add_star(axs_full[dbs_state_id, session_id], 0.20, 1.20, 25)
                             add_star(axs_full[dbs_state_id, session_id], -0.2, 0.8, 28)
 
-                ################################ mittlere Abbildungen ######################################
+                ################################ 4x1 figure ######################################
                 # first three pics
                 if dbs_state == "dbs-comb" and shortcut_type == "plastic":
                     sns.boxplot(
@@ -4590,13 +4127,11 @@ def fig_patients_vs_sims(number_of_persons):
                         },
                         linewidth=1,
                     )
+
                     axs_fixed_and_plastic[session_id].get_legend().remove()
 
                     ################ axis settings #####################
 
-                    # axs_fixed_and_plastic[session_id].set_xticklabels(
-                    #    ["patients", "simulations"]
-                    # )
                     axs_fixed_and_plastic[session_id].tick_params(
                         axis="both", labelsize=label_size
                     )
@@ -4655,6 +4190,9 @@ def fig_patients_vs_sims(number_of_persons):
                         },
                         linewidth=1,
                     )
+
+                    ################## axis settings #####################
+
                     axs_fixed_and_plastic[-1].get_legend().remove()
                     axs_fixed_and_plastic[-1].set_ylabel("")
                     axs_fixed_and_plastic[-1].tick_params(
@@ -4663,9 +4201,6 @@ def fig_patients_vs_sims(number_of_persons):
                     axs_fixed_and_plastic[-1].set_xlabel(
                         "subject type", fontweight="bold", fontsize=label_size
                     )
-                    # axs_fixed_and_plastic[-1].set_xticklabels(
-                    #     ["patients", "simulations"]
-                    # )
 
                     ################# significance * #################
 
@@ -4735,7 +4270,9 @@ def fig_patients_vs_sims(number_of_persons):
 
             ############################### save figs, layout & labels #########################################
 
-            #################### kleine Abbildung ######################
+            #################### 3x1 figure ######################
+            fig.set_linewidth(1)
+
             fig.tight_layout(
                 pad=0,
                 h_pad=1.08,
@@ -4754,7 +4291,7 @@ def fig_patients_vs_sims(number_of_persons):
             plt.close(fig)
             dbs_state_id += 1
 
-        #################### große Abbildung #######################
+        #################### 3x4 figure #######################
 
         if shortcut_type_id == 0:
             fig_full.tight_layout(
@@ -4787,7 +4324,7 @@ def fig_patients_vs_sims(number_of_persons):
         )
         plt.close(fig_full)
 
-    ################## mittlere Abbildung #######################
+    ################## 4x1 figure #######################
 
     fig_fixed_and_plastic.tight_layout(
         pad=0,

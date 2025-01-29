@@ -1326,7 +1326,7 @@ if __name__ == "__main__":
     draws = 4000  # 15000 in patients study
     # tune = 500  # TODO remove
     # draws = 1000  # TODO remove
-    N_SUBJECTS = 14  # TODO change to None
+    N_SUBJECTS =14  # TODO change to None
     draws_prior = 2000
     target_accept = 0.975
     plot_patients = False
@@ -1718,7 +1718,7 @@ if __name__ == "__main__":
                 axes[idx].set_xlabel("Inference Data", fontweight="bold", fontsize=labelsize)
                 # Customize x-axis labels
                 axes[idx].set_xticklabels(
-                    ["patients", "supression", "efferent", "combined"], 
+                    ["patients", "suppression", "efferent", "combined"], 
                     fontsize=labelsize  # Adjust font size here
                 )
               

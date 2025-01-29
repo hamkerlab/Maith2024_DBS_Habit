@@ -1203,7 +1203,7 @@ def dbs_on_vs_off(number_of_persons=None, shortcut=True):
         # Get data in long format with the columns:
         #   "subject"
         #   "unrewarded_decisions"
-        #   "dbs_state" (dbs-off, suppression, efferent, afferent, passing fibres, dbs-comb)
+        #   "dbs_state" (dbs-off, suppression, efferent, afferent, passing fibers, dbs-comb)
         #   "session" (1, 2, 3)
         data_dict = {
             "subject": [],
@@ -1218,7 +1218,7 @@ def dbs_on_vs_off(number_of_persons=None, shortcut=True):
             [1, "suppression"],
             [2, "efferent"],
             [3, "afferent"],
-            [4, "passing fibres"],
+            [4, "passing fibers"],
             [5, "dbs-comb"],
         ]:
             # load the rewarded decisions data
@@ -1443,7 +1443,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
             "suppression (SHORTCUT_ON vs. SHORTCUT_OFF):",
             "EFFERENT (SHORTCUT_ON vs. SHORTCUT_OFF):",
             "AFFERENT (SHORTCUT_ON vs. SHORTCUT_OFF):",
-            "PASSING FIBRES (SHORTCUT_ON vs. SHORTCUT_OFF):",
+            "PASSING FIBERS (SHORTCUT_ON vs. SHORTCUT_OFF):",
             "DBS_ALL (SHORTCUT_ON vs. SHORTCUT_OFF):",
         ]
 
@@ -1453,7 +1453,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 "suppression",
                 "efferent",
                 "afferent",
-                "passing fibres",
+                "passing fibers",
                 "dbs-comb",
             ],
             "S1 t": [],
@@ -1568,14 +1568,14 @@ def run_statistic(H1, H2, H3, number_of_persons):
         data_df_full_sims_compare_dbs = data_df_full_sims_compare_dbs[
             data_df_full_sims_compare_dbs["dbs_state"] != "afferent"
         ]
-        # order the dbs states (dbs-off, suppression, efferent, passing fibres, dbs-comb)
+        # order the dbs states (dbs-off, suppression, efferent, passing fibers, dbs-comb)
         data_df_full_sims_compare_dbs["dbs_state"] = pd.Categorical(
             data_df_full_sims_compare_dbs["dbs_state"],
             categories=[
                 "dbs-off",
                 "suppression",
                 "efferent",
-                "passing fibres",
+                "passing fibers",
                 "dbs-comb",
             ],
             ordered=True,
@@ -1607,7 +1607,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     "dbs-off",
                     "suppression",
                     "efferent",
-                    "passing fibres",
+                    "passing fibers",
                     "dbs-comb",
                 ],
                 ax=axs_compare_dbs[shortcut_type_id],
@@ -1616,7 +1616,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     "efferent": (1, 0.5, 0.5, 0.8),
                     "dbs-comb": (0.8, 0, 0, 0.8),
                     "dbs-off": (0, 0, 0.65),
-                    "passing fibres": (1, 0.3, 0.3, 0.8),
+                    "passing fibers": (1, 0.3, 0.3, 0.8),
                 },
                 boxprops=dict(
                     edgecolor="black", linewidth=1
@@ -1848,7 +1848,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     dbs_red = (0.8, 0, 0, 0.8)
                     dbs_blue = (0, 0, 0.65)
 
-                    ################################ kleine Abbildungen ######################################
+                    ################################ 3x1 figure ######################################
 
                     # create boxplots with seaborn with x=subjec_type, y=unrewarded_decisions, hue=dbs_state
                     sns.boxplot(
@@ -1919,7 +1919,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     legend_bbox = legend.get_window_extent()
                     legend_bbox = legend_bbox.transformed(fig.transFigure.inverted())
 
-                    ################################### große Abbildungen ######################################
+                    ################################### 3x4 figure ######################################
 
                     sns.boxplot(
                         data=data_df_full_combined,
@@ -1953,9 +1953,6 @@ def run_statistic(H1, H2, H3, number_of_persons):
                     axs_full[dbs_state_id, session_id].set_xlabel(
                         "subject type", fontweight="bold", fontsize=label_size
                     )
-                    # axs_full[dbs_state_id, session_id].set_xticklabels(
-                    #    ["patients", "simulations"]
-                    # )
 
                     if session_id >= 1:
                         axs_full[dbs_state_id, session_id].set_ylabel("")
@@ -2084,7 +2081,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                                     axs_full[dbs_state_id, session_id], -0.2, 0.8, 28
                                 )
 
-                    ################################ mittlere Abbildungen ######################################
+                    ################################ 4x1 figure ######################################
                     # first three pics
                     if dbs_state == "dbs-comb" and shortcut_type == "plastic":
                         sns.boxplot(
@@ -2111,9 +2108,6 @@ def run_statistic(H1, H2, H3, number_of_persons):
 
                         ################ axis settings #####################
 
-                        # axs_fixed_and_plastic[session_id].set_xticklabels(
-                        #    ["patients", "simulations"]
-                        # )
                         axs_fixed_and_plastic[session_id].tick_params(
                             axis="both", labelsize=label_size
                         )
@@ -2182,9 +2176,6 @@ def run_statistic(H1, H2, H3, number_of_persons):
                         axs_fixed_and_plastic[-1].set_xlabel(
                             "subject type", fontweight="bold", fontsize=label_size
                         )
-                        # axs_fixed_and_plastic[-1].set_xticklabels(
-                        #     ["patients", "simulations"]
-                        # )
 
                         ################# significance * #################
 
@@ -2256,7 +2247,9 @@ def run_statistic(H1, H2, H3, number_of_persons):
 
                 ############################### save figs, layout & labels #########################################
 
-                #################### kleine Abbildung ######################
+                #################### 3x1 figure ######################
+                fig.set_linewidth(1)
+
                 fig.tight_layout(
                     pad=0,
                     h_pad=1.08,
@@ -2269,7 +2262,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 plt.close(fig)
                 dbs_state_id += 1
 
-            #################### große Abbildung #######################
+            ######################### 3x4 figure #######################
 
             if shortcut_type_id == 0:
                 fig_full.tight_layout(
@@ -2297,7 +2290,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
             )
             plt.close(fig_full)
 
-        ################## mittlere Abbildung #######################
+        ############################# 4x1 figure #######################
 
         fig_fixed_and_plastic.tight_layout(
             pad=0,
@@ -2319,7 +2312,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
             "DBS-OFF vs. suppression:",
             "DBS-OFF vs. EFFERENT:",
             "DBS-OFF vs. AFFERENT:",
-            "DBS-OFF vs. PASSING FIBRES:",
+            "DBS-OFF vs. PASSING FIBERS:",
             "DBS-OFF vs. DBS_ALL:",
         ]
 
@@ -2328,7 +2321,7 @@ def run_statistic(H1, H2, H3, number_of_persons):
                 "dbs-off vs. suppression",
                 "dbs-off vs. efferent",
                 "dbs-off vs. afferent",
-                "dbs-off vs. passing fibres",
+                "dbs-off vs. passing fibers",
                 "dbs-off vs. dbs-comb",
             ],
             "S1 t": [],
@@ -2984,7 +2977,7 @@ def manova_change_activity():
         # Faktoren definieren
         states = ["DBS-OFF", "DBS-ON"]
         conditions = [
-            "supression",
+            "suppression",
             "efferent",
             "afferent",
             "passing-fibres",
@@ -3129,7 +3122,7 @@ def anova_change_activity():
 
     conditions = {
         "dbs-off": table_mean_dbs1,
-        "supression": table_mean_dbs2,
+        "suppression": table_mean_dbs2,
         "efferent": table_mean_dbs3,
         "afferent": table_mean_dbs4,
         "passing-fibres": table_mean_dbs5,
@@ -3264,7 +3257,7 @@ def linear_regression():
 
     dbs_states = [
         "dbs-off",
-        "supression",
+        "suppression",
         "efferent",
         "afferent",
         "passing-fibres",
@@ -3341,10 +3334,10 @@ def linear_regression():
 ######################################## call test function #########################################
 #####################################################################################################
 
-#if __name__ == "__main__":
-    # Funktion aufrufen
-    # manova_change_activity()
-    # anova_change_activity()
-    # anova_load_simulation(100)
-    #linear_regression()
-    #run_statistic(False, True, False, 100)
+# if __name__ == "__main__":
+# Funktion aufrufen
+# manova_change_activity()
+# anova_change_activity()
+# anova_load_simulation(100)
+# linear_regression()
+# run_statistic(False, True, False, 100)
