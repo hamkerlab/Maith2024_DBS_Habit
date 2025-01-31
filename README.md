@@ -1,5 +1,6 @@
 # Maith2024_DBS_Habit
 Source code of simulations and analyses from Maith, O., Apenburg, D., & Hamker, F. H. (2024). Pallidal deep brain stimulation enhances habitual behavior in a neuro-computational basal ganglia model during a reward reversal learning task. Submitted to European Journal of Neuroscience.
+Revision status: The README still needs to be updated to the current code and Figures.
 
 ## Authors:
 
