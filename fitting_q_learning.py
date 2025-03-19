@@ -1582,13 +1582,15 @@ if __name__ == "__main__":
         # plot results of the model comparison
         az.plot_compare(df_comp_loo, insample_dev=False)
         plt.savefig(f"{save_folder}/model_comparison.png")
+        # save figure as pdf
+        plt.savefig(f"{save_folder}/model_comparison.pdf", format="pdf")
         plt.close("all")
 
     # estimate the probability of exploration of the patients
     elif sys.argv[1] == "get_explore":
         # get the p explore data
         inference_types = ["double", "suppression", "efferent", "dbs-comb"]
-        #inference_types = ["double"]  # TODO remove
+        #inference_types = ["dbs-comb"]  # TODO remove
         for inference in inference_types:
             if inference == "double":
                 # load patient data
