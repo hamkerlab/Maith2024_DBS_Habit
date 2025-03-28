@@ -801,6 +801,35 @@ def activity_changes_dbs_on():
             error_dbs5.append(np.std(data_dbs5[i]))
             error_dbs6.append(np.std(data_dbs6[i]))
 
+        table_legend_diffs = [
+            "Cor_in",
+            "StrD1",
+            "StrD2",
+            "STN",
+            "GPi",
+            "GPe",
+            "Thalamus",
+            "Cor_dec",
+            "StrThal",
+        ]
+
+        table = {
+            " ": table_legend_diffs,
+            "mean_suppression": mean_dbs2,
+            "error_suppression": error_dbs2,
+            "mean_efferent": mean_dbs3,
+            "error_efferent": error_dbs3,
+            "mean_afferent": mean_dbs4,
+            "error_afferent": error_dbs4,
+            "mean_passing-fibres": mean_dbs5,
+            "error_passing-fibres": error_dbs5,
+            "mean_dbs-comb": mean_dbs6,
+            "error_dbs-comb": error_dbs6,
+        }
+
+        filename = "statistic/mean_error_table_fig4_diffs"
+        stat.save_table(table, filename)
+
         ############################################ histo settings #####################################################
 
         # sessions
