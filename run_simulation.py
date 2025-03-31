@@ -60,6 +60,7 @@ check_H2 = True
 check_H3 = True
 anova_load_simulation = True
 pairwise_ttest_load_simulation = True
+activity_changes_statistic = True
 previously_selected = False
 
 # Save means and standard errors
@@ -635,6 +636,9 @@ if run_statistic:
 
     if pairwise_ttest_load_simulation:
         stat.anova_load_simulation_ttest(100)
+
+    if activity_changes_statistic:
+        stat.linear_regression()
 
     if save_mean_and_errors:
         stat.save_mean_error(14)
